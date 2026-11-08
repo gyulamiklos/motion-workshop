@@ -1,0 +1,29 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(scripts/check.sh*)",
+      "Bash(scripts/doctor.sh)",
+      "Bash(scripts/typecheck.sh)",
+      "Bash(scripts/update-shotcraft.sh)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)",
+      "Bash(npx remotion still*)",
+      "Bash(npx remotion render*)",
+      "Bash(npx remotion compositions*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(ffprobe*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ]
+  }
+}

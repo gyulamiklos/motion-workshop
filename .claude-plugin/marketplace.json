@@ -1,0 +1,11 @@
+{
+  "name": "motion-workshop",
+  "owner": { "name": "Gyula Miklós" },
+  "plugins": [
+    {
+      "name": "motion-workshop",
+      "source": "./plugin",
+      "description": "Brand films, dev-team recap videos and motion reverse-engineering with HyperFrames, from the motion-graphics workshop repo."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Runs the project check on the staged files before every commit.
+# Enable once per clone: git config core.hooksPath .githooks
+# Documentation-only commits may skip it: SKIP_CHECK=1 git commit ...
+ROOT="$(git rev-parse --show-toplevel)"
+
+# The repo is public: words listed in the local .private-terms (not committed) must not be in
+# a staged line or file name. This runs even with SKIP_CHECK.
+TERMS="$ROOT/.private-terms"
+if [ -f "$TERMS" ]; then
+  pat=$(grep -vE '^[[:space:]]*(#|$)' "$TERMS")
+  if [ -n "$pat" ]; then
+    hits=$( { git diff --cached --name-only --diff-filter=ACMR; git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++'; } \
+      | grep -inE -e "$pat" | head -10)
+    [ -n "$hits" ] && { echo "pre-commit: private term in the staged changes (see .private-terms):"; echo "$hits"; exit 1; }
+  fi
+fi
+
+[ "${SKIP_CHECK:-}" = "1" ] && { echo "pre-commit: check skipped (SKIP_CHECK=1)"; exit 0; }
+exec "$ROOT/scripts/check.sh" --staged

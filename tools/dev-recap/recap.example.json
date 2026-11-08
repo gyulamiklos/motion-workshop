@@ -1,0 +1,23 @@
+{
+  "name": "Fejlesztések, 2026. október 19–25.",
+  "brand": "acme",
+  "audience": "fejlesztői csapat (belső)",
+  "period": { "since": "2026-10-19", "until": "2026-10-25" },
+  "sources": "which repos and branches the items come from (not rendered)",
+  "title": { "eyebrow": "ACME · FEJLESZTÉS", "line1": "Ezen a héten", "line2": "ez lett kész.", "accent": "kész.", "subtitle": "Október 19–25. · app, web" },
+  "stats": { "eyebrow": "A hét számokban", "period": "2026. október 19–25.", "stats": [{ "value": 12, "label": "beolvasztott PR" }, { "value": 2, "label": "repó" }] },
+  "voice": { "speaker": "imre" },
+  "voice_lines": { "intro": "Ez történt a héten.", "stats": "Két repóban tizenkét változtatás került be.", "outro": "Jövő héten folytatjuk." },
+  "items": [
+    {
+      "area": "App",
+      "title": "Rövid cím",
+      "text": "Egy mondat arról, mit nyer vele a felhasználó.",
+      "details": ["Legfeljebb három részlet", "mindegyik pár szó"],
+      "source": "repo · PR #12",
+      "voice": "Egy-két mondat kimondva, a számok betűvel."
+    }
+  ],
+  "outro": { "tagline": "Jövő héten folytatjuk" },
+  "left_out": ["what was not shown and why (not rendered)"]
+}

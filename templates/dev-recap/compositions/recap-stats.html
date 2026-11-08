@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Recap stats</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+    <style>
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-Medium.ttf') format('truetype'); font-weight: 500; }
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-SemiBold.ttf') format('truetype'); font-weight: 600; }
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-Bold.ttf') format('truetype'); font-weight: 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #ffffff; }
+    </style>
+  </head>
+  <body>
+    <!-- The period in numbers: up to four counters whose digits roll into place (a digit strip per place,
+         translated, so every frame is a pure function of time). -->
+    <div
+      id="rs-root"
+      data-composition-id="recap-stats"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="30"
+      data-composition-variables='[
+        {"id":"eyebrow","type":"string","label":"Eyebrow","default":"A hét számokban"},
+        {"id":"period","type":"string","label":"Period","default":"2026. október 19–25."},
+        {"id":"stats","type":"string","label":"Stats (JSON array of value, label; max 4)","default":"[{\"value\":39,\"label\":\"commit\"},{\"value\":19,\"label\":\"lezárt PR\"},{\"value\":3,\"label\":\"repó\"}]"}
+      ]'
+    >
+      <div id="rs-clip" class="clip" data-start="0" data-duration="30" data-track-index="0">
+        <div id="rs-bg"></div>
+        <div id="rs-dots"></div>
+        <div id="rs-eyebrow"><i></i><span id="rs-eyebrow-text"></span></div>
+        <div id="rs-period"></div>
+        <div id="rs-row"></div>
+      </div>
+
+      <style>
+        #rs-root { position: absolute; inset: 0; font-family: 'Figtree', sans-serif; }
+        #rs-clip { position: absolute; inset: 0; overflow: hidden; }
+        #rs-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 50% 46% at 10% 100%, rgba(0,218,150,0.1) 0%, rgba(0,218,150,0) 72%), linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 52%, #F4F4F5 100%); }
+        #rs-dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(9,9,11,0.07) 1.5px, rgba(9,9,11,0) 2px); background-size: 48px 48px; background-position: 24px 24px;
+          -webkit-mask-image: linear-gradient(270deg, rgba(0,0,0,0) 40%, rgba(0,0,0,1) 100%); mask-image: linear-gradient(270deg, rgba(0,0,0,0) 40%, rgba(0,0,0,1) 100%); }
+        #rs-eyebrow { position: absolute; left: 168px; top: 290px; display: flex; align-items: center; gap: 14px; font-size: 28px; font-weight: 600; letter-spacing: 0.16em; color: #007A55; text-transform: uppercase; }
+        #rs-eyebrow i { width: 14px; height: 14px; border-radius: 4px; background: #007A55; display: inline-block; }
+        #rs-period { position: absolute; left: 168px; top: 342px; font-size: 46px; font-weight: 500; color: #3F3F46; letter-spacing: -0.01em; }
+        #rs-row { position: absolute; left: 168px; right: 168px; top: 510px; display: flex; }
+        .rs-stat { flex: 1; padding: 0 40px; border-left: 1px solid rgba(9,9,11,0.11); }
+        .rs-stat:first-child { padding-left: 0; border-left: none; }
+        .rs-num { display: flex; height: 168px; overflow: hidden; font-size: 168px; font-weight: 700; line-height: 1; letter-spacing: -0.04em; color: #09090B; font-variant-numeric: tabular-nums; }
+        .rs-col { display: flex; flex-direction: column; }
+        .rs-col span { height: 168px; display: block; }
+        .rs-label { margin-top: 18px; font-size: 40px; font-weight: 600; color: #007A55; letter-spacing: -0.01em; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          gsap.registerPlugin(CustomEase);
+          CustomEase.create("brandOut", "M0,0 C0.22,1 0.36,1 1,1");
+          CustomEase.create("brandRoll", "M0,0 C0.16,1 0.3,1 1,1");
+
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("rs-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          var v = readVars();
+          var stats = [];
+          try { stats = Array.isArray(v.stats) ? v.stats : JSON.parse(v.stats || "[]"); } catch (e) {}
+          stats = stats.slice(0, 4);
+          document.getElementById("rs-eyebrow-text").textContent = v.eyebrow || "";
+          document.getElementById("rs-period").textContent = v.period || "";
+
+          var f = function (n) { return n / 30; };
+          var tl = gsap.timeline({ paused: true });
+          tl.fromTo("#rs-eyebrow", { opacity: 0, y: 14, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: f(16), ease: "brandOut" }, f(2));
+          tl.fromTo("#rs-period", { opacity: 0, y: 20, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: f(20), ease: "brandOut" }, f(6));
+
+          var row = document.getElementById("rs-row");
+          stats.forEach(function (s, i) {
+            var box = document.createElement("div"); box.className = "rs-stat";
+            var num = document.createElement("div"); num.className = "rs-num";
+            var digits = String(Math.max(0, Math.round(Number(s.value) || 0))).split("");
+            var start = 14 + i * 8;
+            digits.forEach(function (d, j) {
+              // each place rolls through one extra lap; the lower places spin further, like a counter
+              var col = document.createElement("div"); col.className = "rs-col";
+              col.setAttribute("data-layout-ignore", ""); // rolling digits pass by on purpose; the landed number is the read
+              var laps = digits.length - j;
+              for (var k = 0; k <= laps * 10 + Number(d); k++) { var sp = document.createElement("span"); sp.textContent = String(k % 10); col.appendChild(sp); }
+              num.appendChild(col);
+              tl.fromTo(col, { y: 0 }, { y: -(laps * 10 + Number(d)) * 168, duration: f(42), ease: "brandRoll" }, f(start));
+            });
+            var label = document.createElement("div"); label.className = "rs-label"; label.textContent = s.label || "";
+            box.appendChild(num); box.appendChild(label); row.appendChild(box);
+            tl.fromTo(box, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: f(18), ease: "brandOut" }, f(start - 2));
+          });
+          // a long hold still breathes: the grid drifts and the numbers push in slightly
+          tl.fromTo("#rs-dots", { x: 0 }, { x: 48, duration: 30, ease: "none" }, 0);
+          tl.fromTo("#rs-row", { scale: 1 }, { scale: 1.03, duration: 12, ease: "sine.inOut", transformOrigin: "0% 50%" }, f(40));
+          tl.to({}, { duration: 30 }, 0);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["recap-stats"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

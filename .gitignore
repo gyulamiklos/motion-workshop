@@ -1,0 +1,33 @@
+# personal and client work stays on this machine: brand packs, films, archive,
+# product capture tools, notes and the project guard (the repo is public)
+brands/
+projects/
+archive/
+tools/*-capture/
+STATE.md
+docs/
+.claude/guard.json
+.private-terms
+*.bundle
+
+# upstream skill: only its pinned commit (vendor/video-shotcraft.commit) is tracked
+vendor/video-shotcraft/
+
+node_modules/
+out/
+renders/
+*.mp4
+*.mov
+*.webm
+.env*
+CLAUDE.local.md
+
+# HyperFrames working files
+.hyperframes/
+
+# reference videos for motion-breakdown: never committed
+research/
+# generated, rebuilt by tools/tts/setup.sh and tools/dev-recap/build.mjs
+tools/tts/.venv/
+tools/tts/voices/
+projects/*/assets/voice/

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Removes AI attribution lines (the Claude co-author trailer, "Generated with Claude Code")
+# from every commit message, whoever wrote it, and the blank lines they leave at the end.
+# Only the attribution lines themselves go: a line that merely mentions them stays.
+# Enabled together with pre-commit: git config core.hooksPath .githooks
+# It also refuses a message with a word from the local .private-terms (the repo is public).
+TERMS="$(git rev-parse --show-toplevel)/.private-terms"
+if [ -f "$TERMS" ]; then
+  pat=$(grep -vE '^[[:space:]]*(#|$)' "$TERMS")
+  if [ -n "$pat" ] && grep -v '^#' "$1" | grep -qiE -e "$pat"; then
+    echo "commit-msg: private term in the commit message (see .private-terms)"; exit 1
+  fi
+fi
+tmp="$1.tmp.$$"
+awk 'tolower($0) ~ /^[[:space:]]*co-authored-by:.*noreply@anthropic\.com/ { next }
+     tolower($0) ~ /generated with \[claude code\]\(/ { next }
+     { line[++n] = $0 }
+     END { while (n > 0 && line[n] ~ /^[[:space:]]*$/) n--; for (i = 1; i <= n; i++) print line[i] }' "$1" > "$tmp" \
+  && mv "$tmp" "$1"

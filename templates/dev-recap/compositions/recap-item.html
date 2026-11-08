@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Recap item</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+    <style>
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-Regular.ttf') format('truetype'); font-weight: 400; }
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-Medium.ttf') format('truetype'); font-weight: 500; }
+      @font-face { font-family: 'Figtree'; src: url('assets/fonts/Figtree-SemiBold.ttf') format('truetype'); font-weight: 600; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #ffffff; }
+    </style>
+  </head>
+  <body>
+    <!-- One shipped change: area, title, one-line benefit, up to three details, and where it came from.
+         The slot length is set by the host (reading time or voiceover); the entrance takes ~1.4 s, then it holds. -->
+    <div
+      id="ri-root"
+      data-composition-id="recap-item"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="30"
+      data-composition-variables='[
+        {"id":"index","type":"string","label":"Index","default":"01 / 05"},
+        {"id":"area","type":"string","label":"Area","default":"App"},
+        {"id":"title","type":"string","label":"Title","default":"Saját értesítések"},
+        {"id":"text","type":"string","label":"One-line benefit","default":"Mindenki maga dönti el, milyen értesítést kér."},
+        {"id":"details","type":"string","label":"Details (JSON array, max 3)","default":"[\"Beállítások › Értesítéseim\",\"A bevezetőben is beállítható\"]"},
+        {"id":"source","type":"string","label":"Source","default":"app · PR #46"}
+      ]'
+    >
+      <div id="ri-clip" class="clip" data-start="0" data-duration="30" data-track-index="0">
+        <div id="ri-bg"></div>
+        <div id="ri-dots"></div>
+        <div id="ri-eyebrow"><i></i><span id="ri-area"></span></div>
+        <div id="ri-index"></div>
+        <div id="ri-col"><div id="ri-title"></div><div id="ri-text"></div></div>
+        <div id="ri-cards"></div>
+        <div id="ri-source"></div>
+      </div>
+
+      <style>
+        #ri-root { position: absolute; inset: 0; font-family: 'Figtree', sans-serif; }
+        #ri-clip { position: absolute; inset: 0; overflow: hidden; }
+        #ri-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 50% 46% at 92% 100%, rgba(0,218,150,0.1) 0%, rgba(0,218,150,0) 72%), linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 52%, #F4F4F5 100%); }
+        #ri-dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(9,9,11,0.07) 1.5px, rgba(9,9,11,0) 2px); background-size: 48px 48px; background-position: 24px 24px;
+          -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0) 40%, rgba(0,0,0,1) 100%); mask-image: linear-gradient(90deg, rgba(0,0,0,0) 40%, rgba(0,0,0,1) 100%); }
+        #ri-eyebrow { position: absolute; left: 168px; top: 220px; display: flex; align-items: center; gap: 14px; font-size: 28px; font-weight: 600; letter-spacing: 0.16em; color: #007A55; text-transform: uppercase; }
+        #ri-eyebrow i { width: 14px; height: 14px; border-radius: 4px; background: #007A55; display: inline-block; }
+        #ri-index { position: absolute; right: 168px; top: 220px; font-size: 28px; font-weight: 600; letter-spacing: 0.08em; color: #71717B; font-variant-numeric: tabular-nums; }
+        #ri-col { position: absolute; left: 162px; top: 310px; width: 980px; display: flex; flex-direction: column; gap: 36px; }
+        #ri-title { display: flex; flex-wrap: wrap; column-gap: 0.22em; row-gap: 0.06em;
+          font-size: 92px; font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; color: #09090B; }
+        #ri-text { margin-left: 6px; width: 900px; font-size: 42px; font-weight: 400; line-height: 1.3; letter-spacing: -0.01em; color: #3F3F46; }
+        #ri-cards { position: absolute; left: 1220px; top: 330px; width: 532px; display: flex; flex-direction: column; gap: 20px; }
+        .ri-card { display: flex; gap: 18px; align-items: flex-start; padding: 26px 28px; border-radius: 16px; background: #FFFFFF;
+          box-shadow: 0 0 0 1px rgba(9,9,11,0.11), 0 2px 4px rgba(9,9,11,0.04), 0 12px 24px -10px rgba(9,9,11,0.10);
+          font-size: 32px; font-weight: 500; line-height: 1.25; color: #3F3F46; }
+        .ri-card b { flex: none; width: 12px; height: 12px; margin-top: 12px; border-radius: 6px; background: #007A55; }
+        #ri-source { position: absolute; left: 168px; bottom: 150px; font-size: 28px; font-weight: 500; color: #71717B; letter-spacing: 0.01em; }
+        .ri-w { display: inline-block; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          gsap.registerPlugin(CustomEase);
+          CustomEase.create("brandOut", "M0,0 C0.22,1 0.36,1 1,1");
+          CustomEase.create("brandSpring", "M0,0 L0.0333,0.1069 L0.0667,0.3497 L0.1,0.6285 L0.1333,0.8746 L0.1667,1.0516 L0.2,1.151 L0.2333,1.1826 L0.2667,1.166 L0.3,1.1229 L0.3333,1.072 L0.3667,1.0262 L0.4,0.9927 L0.4333,0.9734 L0.4667,0.9667 L0.5,0.9692 L0.5333,0.9768 L0.5667,0.9861 L0.6,0.9946 L0.6333,1.0009 L0.6667,1.0047 L0.7,1.0061 L0.75,1.0051 L0.8,1.0027 L0.85,1.0004 L0.9,0.9992 L1,1");
+
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("ri-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function list(v) {
+            if (Array.isArray(v)) return v;
+            try { var a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+          }
+
+          var v = readVars();
+          document.getElementById("ri-area").textContent = v.area || "";
+          document.getElementById("ri-index").textContent = v.index || "";
+          document.getElementById("ri-source").textContent = v.source || "";
+          var title = document.getElementById("ri-title");
+          var words = String(v.title || "").split(" ").filter(Boolean).map(function (w) {
+            var s = document.createElement("span"); s.className = "ri-w"; s.textContent = w; title.appendChild(s); return s;
+          });
+          // the benefit line flows under the title (a column), however many lines the title takes
+          document.getElementById("ri-text").textContent = v.text || "";
+          var cards = list(v.details).slice(0, 3).map(function (d) {
+            var c = document.createElement("div"); c.className = "ri-card";
+            var dot = document.createElement("b"); var t = document.createElement("span"); t.textContent = d;
+            c.appendChild(dot); c.appendChild(t); document.getElementById("ri-cards").appendChild(c); return c;
+          });
+
+          var f = function (n) { return n / 30; };
+          var tl = gsap.timeline({ paused: true });
+          tl.fromTo("#ri-eyebrow", { opacity: 0, y: 14, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: f(16), ease: "brandOut" }, f(2));
+          tl.fromTo("#ri-index", { opacity: 0 }, { opacity: 1, duration: f(16), ease: "brandOut" }, f(4));
+          words.forEach(function (w, i) {
+            tl.fromTo(w, { opacity: 0, y: 40, filter: "blur(14px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: f(22), ease: "brandOut" }, f(6 + i * 3.5));
+          });
+          var tEnd = 6 + words.length * 3.5;
+          tl.fromTo("#ri-text", { opacity: 0, y: 20, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: f(20), ease: "brandOut" }, f(tEnd));
+          cards.forEach(function (c, i) {
+            tl.fromTo(c, { opacity: 0, y: 36, scale: 0.97 }, { opacity: 1, duration: f(8), ease: "none" }, f(tEnd + 6 + i * 6));
+            tl.fromTo(c, { y: 36, scale: 0.97 }, { y: 0, scale: 1, duration: 0.6, ease: "brandSpring" }, f(tEnd + 6 + i * 6));
+          });
+          tl.fromTo("#ri-source", { opacity: 0 }, { opacity: 1, duration: f(16), ease: "brandOut" }, f(tEnd + 12));
+          // slow drift so a long hold still breathes
+          tl.fromTo("#ri-dots", { x: 0 }, { x: -48, duration: 30, ease: "none" }, 0);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["recap-item"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>
