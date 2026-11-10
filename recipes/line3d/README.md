@@ -18,6 +18,7 @@ Read the principles first, then the card of each element you use.
 | Block | What | Length |
 |---|---|---|
 | `globe-dive.html` | a wire globe boots, four regions are born on the beat, the camera dives into one and lands in a city that rises | 6.6 s |
+| `skybox-room.html` | inside a room with dust on its walls, a whip turn to a corner where nodes are born, a turn back to a wall graph whose curve carries text up to a limit band; flash and push on the hit | 8.6 s |
 
 Render one: `scripts/render-block.sh recipes/line3d/<block>.html [out.mp4]`.
 
@@ -62,14 +63,16 @@ A scene is a pure function of time: build everything once, then `draw(t)` sets u
 
 **Stage:** `createStage(canvas, { width, height, look })` → `stage` with `add(obj)`, `setCamera({ pos, target, fov, roll | up })`, `project(v)` → `{ x, y, visible }` in pixels, `render()`, and the writable `flash`, `bloomStrength`, `shared.uFog.value.set(near, far, min)`.
 
-**Camera:** `cameraRig(keys, { drift, seed })` → `at(t)` (a new sample each call) · `dive(k, from, p, n, up, endHeight, { swing, push, ease })`.
+**Camera:** `cameraRig(keys, { drift, seed })` → `at(t)` (a new sample each call; keys take `target` or `dir: [yaw, pitch]` in degrees) · `dive(k, from, p, n, up, endHeight, { swing, push, ease })`.
+
+**Motion blur:** `stage.renderBlurred(t, pose, { shutter, samples, gain })` renders `pose(tt)` at each `shutterTimes(t, shutter, samples)` and averages; `pose` sets the scene without rendering. `gain` brightens only what is above the background.
 
 **Lines:** `lines(stage, geo, { alpha, glow, hold, draw, back, dash, color, facing, hidden })` → `LineSegments` with `set({ alpha, draw, pulse, hold, glow })` · `occluder(stage, boxes)` → a depth-only mesh · `lineMaterial(stage, opts)`.
 
-**Builders** (line geometry): `sphereLatLong`, `ring`, `sphereCells`, `cellCentre`, `blobRegions`, `gridFloor`, `cellGrid` (+ `boxes`), `box`, `tunnel`, `instances`, `figure`, `warp`. **Points:** `points(stage, positions, opts)`, `scatter(n, { kind })`. **Text:** `textPath(stage, text, curve, opts)`. Details in `cards/primitives.md`.
+**Builders** (line geometry): `sphereLatLong`, `ring`, `sphereCells`, `cellCentre`, `blobRegions`, `gridFloor`, `cellGrid` (+ `boxes`), `box`, `wallGrid`, `path`, `hatch`, `tunnel`, `instances`, `figure`, `warp`. **Points:** `points(stage, positions, opts)`, `scatter(n, { kind: "box" | "shell" | "walls" | "galaxy" })`. **Text:** `textPath(stage, text, curve, opts)` → group with `paint(head, { ahead, window })`. Details in `cards/primitives.md`.
 
 ## Tests
-Kit logic that runs without a GPU (camera rig, colours, occluder geometry):
+Kit logic that runs without a GPU (camera rig, colours, occluder geometry, shutter times, builders):
 
 ```bash
 node --import ./recipes/line3d/test/register.mjs --test recipes/line3d/test/*.test.mjs

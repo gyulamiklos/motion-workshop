@@ -21,13 +21,16 @@ All line builders return `{ positions, normals?, t, dist }` (segment pairs); pas
 | `cellCentre(lat, lon, cell)` | the nearest `sphereCells` centre (dive target) | – | used |
 | `cellGrid({ cols, rows, cell, gap, keep, height, base })` | outlined cells on XZ, extruded into wire boxes; returns `boxes` for `occluder` | by distance from the centre | used (city) |
 | `gridFloor({ size, div })` | floor grid | from the centre out | used |
-| `box({ w, h, d })` | wire box (a room seen from inside) | edge by edge | not yet |
+| `box({ w, h, d })` | wire box (a room seen from inside) | edge by edge | used (room) |
+| `wallGrid({ w, h, d, div, walls })` | faint grid on the inner walls of a room | – | used (room) |
+| `path(points)` | polyline, e.g. a sampled curve or axes | by arc length | used (graph) |
+| `hatch({ w, h, step })` | diagonal hatching in a rectangle (a limit band) | left to right | used (graph) |
 | `tunnel({ rings, step, sides })` | corridor to a vanishing point | from the mouth in | not yet |
 | `instances(geo, [{ p, s, ry, t }])` | copies of one builder output in one draw call | per copy `t` | not yet |
 | `figure({ stripes })` | outlined standing figure, 1 unit tall | head, then body | not yet |
 | `warp({ count, radius, depth })` | radial streaks along -Z | random | used (pilot sparks) |
-| `points(stage, positions, { sizes, births, glow })` + `scatter(n, { kind: "box" \| "shell" \| "galaxy" })` | dust, star shells, a galaxy | per point `birth` | used (seed point) |
-| `textPath(stage, text, curve, { font, size })` | glyph sprites along a 3D curve | `update(progress)` | not yet |
+| `points(stage, positions, { sizes, births, glow })` + `scatter(n, { kind: "box" \| "shell" \| "walls" \| "galaxy" })` | dust, star shells, dust on a room's walls, a galaxy | per point `birth` | used (seed point, room dust, nodes) |
+| `textPath(stage, text, curve, { font, size, offset })` | glyphs sitting on a curve in its XY plane; `paint(head, { ahead, window })`: white behind the head, the current word in the accent, the next words grey within `window` | by the head | used (graph) |
 
 ## Motion core
 - **What is born faces the camera.** A part that appears on the far side or at a graze is wasted: choose its position in view space at its birth time and subtract the object's spin (`lon = lonView - SPIN * tBirth`). Region 04 is also the dive target, so it faces the camera at the dive.

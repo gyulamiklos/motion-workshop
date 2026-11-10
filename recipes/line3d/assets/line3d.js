@@ -77,8 +77,16 @@ export function drift(seed) {
   return (t) => (Math.sin(t * w[0] * 6.283 + p[0]) * 0.55 + Math.sin(t * w[1] * 6.283 + p[1]) * 0.3 + Math.sin(t * w[2] * 6.283 + p[2]) * 0.15);
 }
 
+// Motion blur: the sample times inside one frame's shutter, ending at t (the frame shows where things are at t).
+// shutter in seconds (1/60 at 60 fps is a 360° shutter; a whip smear reads as ~1-2 frames).
+export function shutterTimes(t, shutter, samples) {
+  return Array.from({ length: samples }, (_, i) => t - shutter * (1 - (i + 0.5) / samples));
+}
+
 // ---------------------------------------------------------------- camera rig
-// keys: [{ t, pos: [x,y,z], target: [x,y,z], fov?, roll?, ease? }], sorted by t. The ease of a key shapes the move
+// keys: [{ t, pos: [x,y,z], target: [x,y,z], fov?, roll?, ease? }], sorted by t. Instead of `target`, a key can give
+// `dir: [yaw, pitch]` in degrees (yaw 0 looks down -Z, positive turns left; pitch positive looks up): between two
+// such keys the angles are eased, so a whip turns at the eased angular speed (a target lerp would not). The ease of a key shapes the move
 // that ARRIVES at it. Before the first key and after the last the camera holds that key, plus drift.
 // o.drift: amplitude in world units of a seeded wander on position and target (the camera is never still).
 export function cameraRig(keys, o = {}) {
@@ -93,7 +101,10 @@ export function cameraRig(keys, o = {}) {
     const k0 = keys[i], k1 = keys[Math.min(i + 1, keys.length - 1)];
     const k = k1 === k0 || t <= k0.t ? 0 : ease(k1.ease || "power2.inOut")(clamp01((t - k0.t) / (k1.t - k0.t)));
     out.pos.copy(a.fromArray(k0.pos)).lerp(b.fromArray(k1.pos), k);
-    out.target.copy(a.fromArray(k0.target)).lerp(b.fromArray(k1.target), k);
+    if (k0.dir && k1.dir) {
+      const yaw = THREE.MathUtils.degToRad(lerp(k0.dir[0], k1.dir[0], k)), pitch = THREE.MathUtils.degToRad(lerp(k0.dir[1], k1.dir[1], k));
+      out.target.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)).add(out.pos);
+    } else out.target.copy(a.fromArray(k0.target)).lerp(b.fromArray(k1.target), k);
     out.fov = lerp(k0.fov ?? 40, k1.fov ?? 40, k);
     out.roll = lerp(k0.roll ?? 0, k1.roll ?? 0, k);
     if (amp) {
@@ -148,6 +159,9 @@ export function createStage(canvas, o = {}) {
   const rtA = new THREE.WebGLRenderTarget(hw, hh, { type: THREE.HalfFloatType, depthBuffer: false });
   const rtB = new THREE.WebGLRenderTarget(hw, hh, { type: THREE.HalfFloatType, depthBuffer: false });
 
+  const rtSub = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, depthBuffer: false });
+  const rtAcc = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, depthBuffer: false });
+
   const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
   const quadScene = new THREE.Scene();
@@ -185,6 +199,44 @@ export function createStage(canvas, o = {}) {
     depthTest: false, depthWrite: false,
   });
 
+  // motion blur: each sub-frame composite is added at 1/n, then the sum is copied to the canvas
+  const accMat = new THREE.ShaderMaterial({
+    // the background is added at 1/n (it sums to itself); only what lies above it is scaled by gain/n
+    uniforms: { tSrc: { value: rtSub.texture }, uK: { value: 1 }, uB: { value: 1 }, uBg: compMat.uniforms.uBg },
+    vertexShader: fsVert,
+    fragmentShader: `uniform sampler2D tSrc; uniform float uK, uB; uniform vec3 uBg; varying vec2 vUv;
+      void main(){ vec3 c = texture2D(tSrc, vUv).rgb; gl_FragColor = vec4(max(c - uBg, 0.0) * uK + uBg * uB, 1.0); }`,
+    depthTest: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending,
+  });
+  const copyMat = new THREE.ShaderMaterial({
+    uniforms: { tSrc: { value: rtAcc.texture } },
+    vertexShader: fsVert,
+    fragmentShader: "uniform sampler2D tSrc; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tSrc, vUv).rgb, 1.0); }",
+    depthTest: false, depthWrite: false,
+  });
+  const quadTo = (mat, dst) => { quad.material = mat; renderer.setRenderTarget(dst); renderer.render(quadScene, quadCam); };
+
+  // the scene, its glow pass and the bloom, composited into dst (null = the canvas)
+  function frame(dst) {
+    camera.updateMatrixWorld();
+    renderer.setClearColor(0x000000, 1);
+    shared.uGlowPass.value = 0;
+    renderer.setRenderTarget(rtMain); renderer.clear(); renderer.render(scene, camera);
+    shared.uGlowPass.value = 1;
+    renderer.setRenderTarget(rtGlow); renderer.clear(); renderer.render(scene, camera);
+    shared.uGlowPass.value = 0;
+    // bloom: glow -> half size, two separable passes, the second one wider
+    const r = look.bloomRadius;
+    const pass = (src, d, dx, dy) => { blurMat.uniforms.tSrc.value = src.texture; blurMat.uniforms.uDir.value.set(dx / hw, dy / hh); quadTo(blurMat, d); };
+    pass(rtGlow, rtA, r, 0); pass(rtA, rtB, 0, r);
+    pass(rtB, rtA, r * 2.5, 0); pass(rtA, rtB, 0, r * 2.5);
+    pass(rtB, rtA, r * 5, 0); pass(rtA, rtB, 0, r * 5);
+    compMat.uniforms.tBloom.value = rtB.texture;
+    compMat.uniforms.uFlash.value = stage.flash;
+    compMat.uniforms.uStrength.value = stage.bloomStrength;
+    renderer.setRenderTarget(dst); renderer.clear(); quadTo(compMat, dst);
+  }
+
   const stage = {
     THREE, W, H, look, renderer, scene, camera, shared, flash: 0, bloomStrength: look.bloomStrength,
     add(obj) { scene.add(obj); return obj; },
@@ -201,27 +253,18 @@ export function createStage(canvas, o = {}) {
       const p = v.clone().project(camera);
       return { x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H, visible: p.z < 1 && p.z > -1 };
     },
-    render() {
-      camera.updateMatrixWorld();
-      renderer.setClearColor(0x000000, 1);
-      shared.uGlowPass.value = 0;
-      renderer.setRenderTarget(rtMain); renderer.clear(); renderer.render(scene, camera);
-      shared.uGlowPass.value = 1;
-      renderer.setRenderTarget(rtGlow); renderer.clear(); renderer.render(scene, camera);
-      shared.uGlowPass.value = 0;
-      // bloom: glow -> half size, two separable passes, the second one wider
-      const r = look.bloomRadius;
-      const pass = (src, dst, dx, dy) => {
-        blurMat.uniforms.tSrc.value = src.texture; blurMat.uniforms.uDir.value.set(dx / hw, dy / hh);
-        quad.material = blurMat; renderer.setRenderTarget(dst); renderer.render(quadScene, quadCam);
-      };
-      pass(rtGlow, rtA, r, 0); pass(rtA, rtB, 0, r);
-      pass(rtB, rtA, r * 2.5, 0); pass(rtA, rtB, 0, r * 2.5);
-      pass(rtB, rtA, r * 5, 0); pass(rtA, rtB, 0, r * 5);
-      compMat.uniforms.tBloom.value = rtB.texture;
-      compMat.uniforms.uFlash.value = stage.flash;
-      compMat.uniforms.uStrength.value = stage.bloomStrength;
-      quad.material = compMat; renderer.setRenderTarget(null); renderer.clear(); renderer.render(quadScene, quadCam);
+    render() { frame(null); },
+    // The frame at t with motion blur: pose(tt) puts the scene and the camera at time tt (no render); it is called
+    // for each shutter sample and finally at t again, so the scene is left at t. o: { shutter, samples, gain }.
+    // gain > 1 keeps a smeared line bright (an average dims it by its spread); the sum is clamped at white.
+    renderBlurred(t, pose, o = {}) {
+      const times = shutterTimes(t, o.shutter ?? 1 / 60, o.samples ?? 8);
+      renderer.setRenderTarget(rtAcc); renderer.setClearColor(0x000000, 1); renderer.clear();
+      accMat.uniforms.uK.value = (o.gain ?? 1) / times.length;
+      accMat.uniforms.uB.value = 1 / times.length;
+      times.forEach((tt) => { pose(tt); frame(rtSub); quadTo(accMat, rtAcc); });
+      pose(t);
+      quadTo(copyMat, null);
     },
   };
   return stage;
@@ -480,6 +523,44 @@ export function cellGrid(o = {}) {
   return { ...g.done(), boxes }; // boxes: for occluder()
 }
 
+// A polyline through points ([[x,y,z], ...]); draw-on by arc length (a curve drawn from its start).
+export function path(pts, o = {}) {
+  const g = Geo();
+  let L = 0;
+  const acc = [0];
+  for (let i = 1; i < pts.length; i++) { L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]); acc.push(L); }
+  for (let i = 0; i < pts.length - 1; i++) g.poly([pts[i], pts[i + 1]], null, acc[i] / L, acc[i + 1] / L);
+  return o.closed ? g.poly([pts.at(-1), pts[0]], null, 1, 1).done() : g.done();
+}
+
+// Diagonal hatching inside a w x h rectangle in the XY plane, lower-left corner at the origin (a band, a limit zone).
+export function hatch(o = {}) {
+  const w = o.w ?? 4, h = o.h ?? 0.3, step = o.step ?? 0.08, g = Geo();
+  for (let c = -h; c < w; c += step) {
+    const x0 = Math.max(0, c), x1 = Math.min(w, c + h);
+    if (x1 > x0) g.poly([[x0, x0 - c, 0], [x1, x1 - c, 0]], null, x0 / w, x1 / w);
+  }
+  return g.done();
+}
+
+// Grid lines on the inner walls of a w x h x d room centred at the origin, `div` cells along the room's height.
+// walls: any of "back", "front", "left", "right", "floor", "ceiling" (default: all but the front).
+export function wallGrid(o = {}) {
+  const w = (o.w ?? 8) / 2, h = (o.h ?? 4.5) / 2, d = (o.d ?? 8) / 2, step = (2 * h) / (o.div ?? 6), g = Geo();
+  const walls = o.walls ?? ["back", "left", "right", "floor", "ceiling"];
+  const lines = (a0, a1, b0, b1, put) => {
+    for (let a = a0 + step; a < a1 - 1e-6; a += step) g.poly([put(a, b0), put(a, b1)], null, 0, 1);
+    for (let b = b0 + step; b < b1 - 1e-6; b += step) g.poly([put(a0, b), put(a1, b)], null, 0, 1);
+  };
+  if (walls.includes("back")) lines(-w, w, -h, h, (a, b) => [a, b, -d]);
+  if (walls.includes("front")) lines(-w, w, -h, h, (a, b) => [a, b, d]);
+  if (walls.includes("left")) lines(-d, d, -h, h, (a, b) => [-w, b, a]);
+  if (walls.includes("right")) lines(-d, d, -h, h, (a, b) => [w, b, a]);
+  if (walls.includes("floor")) lines(-w, w, -d, d, (a, b) => [a, -h, b]);
+  if (walls.includes("ceiling")) lines(-w, w, -d, d, (a, b) => [a, h, b]);
+  return g.done();
+}
+
 // Wire box (w x h x d) centred at the origin; inside: true adds nothing but is the convention for a room.
 export function box(o = {}) {
   const w = (o.w ?? 1) / 2, h = (o.h ?? 1) / 2, d = (o.d ?? 1) / 2, g = Geo();
@@ -585,6 +666,13 @@ export function scatter(n, o = {}) {
   for (let i = 0; i < n; i++) {
     let x, y, z;
     if (kind === "box") { x = (r() - 0.5) * (o.w ?? 10); y = (r() - 0.5) * (o.h ?? 10); z = (r() - 0.5) * (o.d ?? 10); }
+    else if (kind === "walls") { // dust painted on the inner walls of a room (w x h x d), a little in front of them
+      const w = (o.w ?? 8) / 2, h = (o.h ?? 4.5) / 2, d = (o.d ?? 8) / 2, a = r() * 2 - 1, b = r() * 2 - 1, in_ = 0.995;
+      const areas = [w * h, d * h, d * h, w * d, w * d], tot = areas.reduce((p, q) => p + q, 0);
+      let pick = r() * tot, k = 0;
+      while (pick > areas[k]) { pick -= areas[k]; k++; }
+      [x, y, z] = [[a * w, b * h, -d * in_], [-w * in_, b * h, a * d], [w * in_, b * h, a * d], [a * w, -h * in_, b * d], [a * w, h * in_, b * d]][k];
+    }
     else if (kind === "shell") { const u = r() * 2 - 1, a = r() * Math.PI * 2, s = Math.sqrt(1 - u * u), R = o.radius ?? 10; x = s * Math.cos(a) * R; y = u * R; z = s * Math.sin(a) * R; }
     else { // galaxy
       const arms = o.arms ?? 3, R = o.radius ?? 3, k = Math.pow(r(), 1.5), arm = (i % arms) / arms * Math.PI * 2;
@@ -607,31 +695,82 @@ export function warp(o = {}) {
 }
 
 // ---------------------------------------------------------------- text on a 3D path
-// Glyph sprites (one canvas texture per glyph) placed along a THREE.Curve, facing the camera's plane of the curve.
-// update(progress): glyphs up to `progress` (0..1) are shown; `accentFrom` index onward can be pulsed with set().
+// Glyphs (one canvas texture each) set along a THREE.Curve that lies in its local XY plane; put the curve's group
+// anywhere in 3D. Each glyph sits on the curve (its baseline `offset` x size above it), turned to the tangent.
+// Same look rules as lines: fog, accent only in the glow pass, additive. o: { font, size, start, offset, color }.
+// group.paint(head, { ahead, window }): words before the head white, the word under the head in the accent, words
+// after it at alpha `ahead` (0 = hidden), fading out over `window` (0..1 along the curve) ahead of the head, so only
+// the next words are there. The font must be loaded by the page (an element using it), or the canvas falls back.
+const GLYPH_FRAG = `
+  uniform sampler2D map; uniform vec3 uColor, uAccent; uniform float uAlpha, uPulse, uGlow, uGlowPass;
+  varying vec2 vUv; varying float vFog;
+  void main(){
+    float a = texture2D(map, vUv).a * uAlpha * vFog;
+    if (a < 0.003) discard;
+    vec3 c = uGlowPass > 0.5 ? uAccent * uPulse + uColor * uGlow : mix(uColor, uAccent, uPulse);
+    gl_FragColor = vec4(c * a, 1.0);
+  }`;
+const GLYPH_VERT = `
+  uniform vec3 uFog; varying vec2 vUv; varying float vFog;
+  void main(){
+    vUv = uv;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vFog = mix(1.0, uFog.z, smoothstep(uFog.x, uFog.y, -mv.z));
+    gl_Position = projectionMatrix * mv;
+  }`;
+
 export async function textPath(stage, text, curve, o = {}) {
-  const font = o.font ?? "700 64px 'Archivo Black'";
+  const px = 64, font = o.font ?? `${px}px 'Archivo Black'`;
   await document.fonts.load(font);
-  const size = o.size ?? 0.18, group = new THREE.Group(), glyphs = [];
-  const cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+  const size = o.size ?? 0.18, scale = size / px, len = curve.getLength(), group = new THREE.Group(), glyphs = [];
+  const ctx = document.createElement("canvas").getContext("2d");
   ctx.font = font;
-  const widths = [...text].map((ch) => ctx.measureText(ch).width);
-  const total = widths.reduce((a, b) => a + b, 0), len = curve.getLength(), scale = (size / 64);
-  let at = (o.start ?? 0) * len;
-  [...text].forEach((ch, i) => {
+  const chars = [...text], widths = chars.map((ch) => ctx.measureText(ch).width);
+  let at = (o.start ?? 0) * len, word = 0;
+  chars.forEach((ch, i) => {
     const w = widths[i] * scale;
-    if (ch.trim()) {
-      const c = document.createElement("canvas"); c.width = Math.ceil(widths[i]) + 8; c.height = 88;
-      const x = c.getContext("2d"); x.font = font; x.fillStyle = "#fff"; x.textBaseline = "middle"; x.fillText(ch, 4, 46);
-      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.NoColorSpace;
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, opacity: 1, blending: THREE.AdditiveBlending });
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(c.width * scale, c.height * scale), mat);
-      const u = Math.min(1, (at + w / 2) / len), p = curve.getPointAt(u), tan = curve.getTangentAt(u);
-      m.position.copy(p); m.rotation.z = Math.atan2(tan.y, tan.x);
-      group.add(m); glyphs.push({ m, at: (at + w / 2) / len });
-    }
+    if (!ch.trim()) { at += w; word++; return; }
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(widths[i]) + 8; c.height = Math.ceil(px * 1.4);
+    const x = c.getContext("2d");
+    x.font = font; x.fillStyle = "#fff"; x.textBaseline = "alphabetic"; x.fillText(ch, 4, Math.round(px * 1.05));
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.NoColorSpace;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: tex }, uAccent: stage.shared.uAccent, uFog: stage.shared.uFog, uGlowPass: stage.shared.uGlowPass,
+        uColor: { value: color(o.color ?? stage.look.line) }, uAlpha: { value: 1 }, uPulse: { value: 0 }, uGlow: { value: 0 },
+      },
+      vertexShader: GLYPH_VERT, fragmentShader: GLYPH_FRAG,
+      transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    // the plane's origin on the baseline: the canvas baseline is at 1.05 px from the top of 1.4 px
+    const geo = new THREE.PlaneGeometry(c.width * scale, c.height * scale);
+    geo.translate(0, (c.height / 2 - px * 1.05) * scale, 0);
+    const m = new THREE.Mesh(geo, mat);
+    m.frustumCulled = false;
+    const u = Math.min(1, (at + w / 2) / len), p = curve.getPointAt(u), tan = curve.getTangentAt(u);
+    m.position.set(p.x - tan.y * (o.offset ?? 0.25) * size, p.y + tan.x * (o.offset ?? 0.25) * size, p.z);
+    m.rotation.z = Math.atan2(tan.y, tan.x);
+    m.set = (v) => { for (const k in v) { const un = mat.uniforms["u" + k[0].toUpperCase() + k.slice(1)]; if (un) un.value = v[k]; } };
+    group.add(m);
+    glyphs.push({ m, at: u, word });
     at += w;
   });
-  group.update = (progress) => glyphs.forEach((g) => (g.m.visible = g.at <= progress * ((o.start ?? 0) + total * scale / len)));
+  group.glyphs = glyphs;
+  group.end = Math.min(1, at / len);
+  const wordStart = [];
+  glyphs.forEach((g) => (wordStart[g.word] = Math.min(wordStart[g.word] ?? 1, g.at)));
+  group.paint = (head, p = {}) => {
+    const cur = wordStart.reduce((k, ws, wi) => (ws !== undefined && ws <= head ? wi : k), -1);
+    glyphs.forEach((g) => {
+      const ahead = g.word > cur;
+      const near = p.window ? clamp01(1 - (wordStart[g.word] - head) / p.window) : 1;
+      const a = ahead ? (p.ahead ?? 0.3) * near : 1;
+      g.m.visible = a > 0.002;
+      g.m.set({ alpha: a, pulse: g.word === cur ? 1 : 0, glow: g.word === cur ? (p.glow ?? 0.25) : 0 });
+    });
+  };
+  group.paint(-1);
   return group;
 }

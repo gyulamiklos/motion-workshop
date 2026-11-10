@@ -32,3 +32,41 @@ test("look colours reach the frame as written: hex in, the same bytes out (no sR
   const a = K.color("#ff2d8c");
   assert.deepEqual([a.r, a.g, a.b].map((v) => Math.round(v * 255)), [255, 45, 140]);
 });
+
+test("shutterTimes spreads samples evenly over the shutter, ending inside the frame at t", () => {
+  const ts = K.shutterTimes(1, 0.1, 4);
+  assert.equal(ts.length, 4);
+  ts.forEach((v, i) => assert.ok(Math.abs(v - (0.9 + 0.025 * (i + 0.5))) < 1e-9, `sample ${i}: ${v}`));
+  assert.ok(ts.at(-1) < 1 && ts[0] > 0.9);
+});
+
+test("path draws on by arc length", () => {
+  const g = K.path([[0, 0, 0], [1, 0, 0], [1, 3, 0]]);
+  assert.deepEqual(g.t, [0, 0.25, 0.25, 1]);
+});
+
+test("hatch stays inside its rectangle", () => {
+  const g = K.hatch({ w: 2, h: 0.5, step: 0.1 });
+  for (let i = 0; i < g.positions.length; i += 3) {
+    assert.ok(g.positions[i] >= -1e-9 && g.positions[i] <= 2 + 1e-9);
+    assert.ok(g.positions[i + 1] >= -1e-9 && g.positions[i + 1] <= 0.5 + 1e-9);
+  }
+});
+
+test("wall dust lies on the room's inner walls", () => {
+  const p = K.scatter(500, { kind: "walls", w: 8, h: 4, d: 6, seed: 2 });
+  for (let i = 0; i < p.length; i += 3) {
+    const [x, y, z] = [p[i], p[i + 1], p[i + 2]];
+    const onWall = Math.abs(Math.abs(x) - 4) < 0.05 || Math.abs(Math.abs(y) - 2) < 0.05 || Math.abs(z + 3) < 0.05;
+    assert.ok(onWall, `${x},${y},${z}`);
+  }
+});
+
+test("cameraRig dir keys turn at the eased angle, not along a straight target line", () => {
+  const rig = K.cameraRig([
+    { t: 0, pos: [0, 0, 0], dir: [0, 0] },
+    { t: 1, pos: [0, 0, 0], dir: [-90, 0], ease: "none" },
+  ]);
+  const mid = rig(0.5).target; // 45° to the right of -Z
+  assert.ok(Math.abs(mid.x - Math.SQRT1_2) < 1e-9 && Math.abs(mid.z + Math.SQRT1_2) < 1e-9, `${mid.x}, ${mid.z}`);
+});
