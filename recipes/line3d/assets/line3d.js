@@ -24,6 +24,10 @@ export const LOOK = {
 export const PULSE = { attack: 0.06, half: 0.025 }; // 3-4 frames up, half-life ~1.5 frames at 60 fps
 export const FLASH = { lift: 0.2, half: 0.05 }; // +50/255 for one frame, half-life ~3 frames
 
+// A CSS colour as the frame should show it. The stage writes linear output with no conversion, so the colour is read
+// as already linear: "#0a090c" lands as RGB 10, 9, 12. (new THREE.Color(hex) would convert sRGB to linear and darken it.)
+export const color = (css) => new THREE.Color().setStyle(css, THREE.LinearSRGBColorSpace);
+
 // ---------------------------------------------------------------- time helpers
 export function mulberry32(seed) {
   return function () {
@@ -80,9 +84,10 @@ export function drift(seed) {
 export function cameraRig(keys, o = {}) {
   const amp = o.drift ?? 0;
   const dx = drift((o.seed ?? 7) + 1), dy = drift((o.seed ?? 7) + 2), dz = drift((o.seed ?? 7) + 3);
-  const out = { pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 40, roll: 0 };
   const a = new THREE.Vector3(), b = new THREE.Vector3();
+  // Every call returns a new sample, so two samples (e.g. now and a later key) can be blended safely.
   return function at(t) {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 40, roll: 0 };
     let i = 0;
     while (i < keys.length - 1 && t >= keys[i + 1].t) i++;
     const k0 = keys[i], k1 = keys[Math.min(i + 1, keys.length - 1)];
@@ -132,7 +137,7 @@ export function createStage(canvas, o = {}) {
   const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 200);
   const shared = {
     uGlowPass: { value: 0 },
-    uAccent: { value: new THREE.Color(look.accent) },
+    uAccent: { value: color(look.accent) },
     uFog: { value: new THREE.Vector3(look.fogNear, look.fogFar, look.fogMin) },
   };
 
@@ -167,7 +172,7 @@ export function createStage(canvas, o = {}) {
   const compMat = new THREE.ShaderMaterial({
     uniforms: {
       tMain: { value: rtMain.texture }, tGlow: { value: rtGlow.texture }, tBloom: { value: rtA.texture },
-      uBg: { value: new THREE.Color(look.background) }, uStrength: { value: look.bloomStrength }, uFlash: { value: 0 },
+      uBg: { value: color(look.background) }, uStrength: { value: look.bloomStrength }, uFlash: { value: 0 },
     },
     vertexShader: fsVert,
     fragmentShader: `uniform sampler2D tMain, tGlow, tBloom; uniform vec3 uBg; uniform float uStrength, uFlash; varying vec2 vUv;
@@ -226,6 +231,8 @@ export function createStage(canvas, o = {}) {
 // One material for every line: white at `alpha`, faded by depth fog, the side facing away from the camera dashed
 // and dimmer (needs a `normal` attribute), drawn on along `aT` (0..1 per polyline) up to `draw`, and mixed to the
 // accent by `pulse`. In the glow pass it writes only the accent share and `glow`.
+// Hidden lines: lines test depth but never write it, so only occluder() solids hide them. A line drawn with
+// `hidden: true` gets a second pass for its occluded parts (depth test inverted), dashed and dimmed like a back side.
 const LINE_VERT = `
   attribute float aT; attribute float aDist;
   uniform vec3 uFog;
@@ -248,7 +255,11 @@ const LINE_FRAG = `
   void main(){
     if (vT > uDraw) discard;
     float a = uAlpha * vFog;
-    if (vFacing < 0.0) {
+    float facing = vFacing;
+    #ifdef L3_HIDDEN
+      facing = -1.0; // the occluded pass: always drawn like a back side
+    #endif
+    if (facing < 0.0) {
       if (uDash > 0.0 && fract(vDist / uDash) > 0.5) discard;
       a *= uBack;
     }
@@ -263,19 +274,22 @@ const LINE_FRAG = `
 
 export function lineMaterial(stage, o = {}) {
   const look = stage.look;
+  const defines = o.facing === false ? {} : { L3_FACING: 1 };
+  if (o.hiddenPass) defines.L3_HIDDEN = 1;
   const m = new THREE.ShaderMaterial({
-    uniforms: {
+    uniforms: o.uniforms ?? {
       uAccent: stage.shared.uAccent, uFog: stage.shared.uFog, uGlowPass: stage.shared.uGlowPass,
-      uColor: { value: new THREE.Color(o.color ?? look.line) },
+      uColor: { value: color(o.color ?? look.line) },
       uAlpha: { value: o.alpha ?? look.lineAlpha },
       uBack: { value: o.back ?? look.backAlpha },
       uDash: { value: o.dash ?? look.dash },
       uDraw: { value: o.draw ?? 1 },
       uPulse: { value: 0 }, uHold: { value: o.hold ?? 0 }, uGlow: { value: o.glow ?? 0 },
     },
-    defines: o.facing === false ? {} : { L3_FACING: 1 },
+    defines,
     vertexShader: LINE_VERT, fragmentShader: LINE_FRAG,
-    transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+    transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    depthFunc: o.hiddenPass ? THREE.GreaterDepth : THREE.LessEqualDepth,
   });
   // Shorthands for draw(t): m.set({ alpha, draw, pulse, hold, glow })
   m.set = (v) => {
@@ -299,7 +313,34 @@ export function lines(stage, geo, o = {}) {
   const obj = new THREE.LineSegments(g, mat);
   obj.frustumCulled = false;
   obj.set = mat.set;
+  if (o.hidden) {
+    // the occluded parts: same geometry and uniforms (one set() drives both), inverted depth test, back-side style
+    const back = new THREE.LineSegments(g, lineMaterial(stage, { ...o, facing: !!geo.normals && o.facing !== false, hiddenPass: true, uniforms: mat.uniforms }));
+    back.frustumCulled = false;
+    obj.add(back);
+  }
   return obj;
+}
+
+// Depth-only solids that hide the lines behind them (hidden-line mode). They draw no colour: the background shows
+// through, as if the faces were painted black. boxes: [{ x, y?, z, w, h, d }] (y = the bottom, default 0).
+// Pushed back by a polygon offset so the object's own front edges stay visible.
+export function occluder(stage, boxes) {
+  const pos = [], idx = [];
+  const F = [[0, 1, 2, 0, 2, 3], [4, 6, 5, 4, 7, 6], [0, 4, 5, 0, 5, 1], [3, 2, 6, 3, 6, 7], [0, 3, 7, 0, 7, 4], [1, 5, 6, 1, 6, 2]];
+  boxes.forEach((b) => {
+    const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, y0 = b.y ?? 0, y1 = y0 + b.h, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, v = pos.length / 3;
+    pos.push(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1);
+    F.forEach((f) => f.forEach((k) => idx.push(v + k)));
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  const mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  const m = new THREE.Mesh(g, mat);
+  m.frustumCulled = false;
+  m.renderOrder = -1; // depth first, then the lines test against it
+  return m;
 }
 
 // ---------------------------------------------------------------- geometry builders
@@ -422,7 +463,7 @@ export function gridFloor(o = {}) {
 export function cellGrid(o = {}) {
   const cols = o.cols ?? 40, rows = o.rows ?? 40, cell = o.cell ?? 0.2, gap = o.gap ?? 0.3, g = Geo();
   const keep = o.keep || (() => true), height = o.height || (() => 0), q = (cell * (1 - gap)) / 2;
-  const maxD = Math.hypot(cols, rows) / 2;
+  const maxD = Math.hypot(cols, rows) / 2, boxes = [];
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
     if (!keep(i, j)) continue;
     const x = (i - cols / 2 + 0.5) * cell, z = (j - rows / 2 + 0.5) * cell;
@@ -430,12 +471,13 @@ export function cellGrid(o = {}) {
     const base = [[x - q, 0, z - q], [x + q, 0, z - q], [x + q, 0, z + q], [x - q, 0, z + q]];
     if (o.base !== false) g.poly(base, null, t0, t0 + 0.05, true);
     if (hgt > 0) {
+      boxes.push({ x, z, w: 2 * q, d: 2 * q, h: hgt });
       const top = base.map((p) => [p[0], hgt, p[2]]);
       g.poly(top, null, t0 + 0.05, t0 + 0.12, true);
       base.forEach((p, k) => g.poly([p, top[k]], null, t0 + 0.02, t0 + 0.1));
     }
   }
-  return g.done();
+  return { ...g.done(), boxes }; // boxes: for occluder()
 }
 
 // Wire box (w x h x d) centred at the origin; inside: true adds nothing but is the convention for a room.
@@ -505,7 +547,7 @@ export function points(stage, positions, o = {}) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uAccent: stage.shared.uAccent, uFog: stage.shared.uFog, uGlowPass: stage.shared.uGlowPass,
-      uColor: { value: new THREE.Color(o.color ?? stage.look.line) }, uAlpha: { value: o.alpha ?? 0.8 },
+      uColor: { value: color(o.color ?? stage.look.line) }, uAlpha: { value: o.alpha ?? 0.8 },
       uSize: { value: o.size ?? 2.5 }, uDraw: { value: 1 }, uPulse: { value: 0 }, uHold: { value: 0 }, uGlow: { value: o.glow ?? 0 },
       uPx: { value: stage.H / 1080 },
     },
@@ -528,7 +570,7 @@ export function points(stage, positions, o = {}) {
         vec3 c = mix(uColor, uAccent, p);
         gl_FragColor = vec4((uGlowPass > 0.5 ? uAccent * p + uColor * uGlow : c) * a, 1.0);
       }`,
-    transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+    transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
   mat.set = (v) => { for (const k in v) { const u = mat.uniforms["u" + k[0].toUpperCase() + k.slice(1)]; if (u) u.value = v[k]; } return mat; };
   const obj = new THREE.Points(g, mat);

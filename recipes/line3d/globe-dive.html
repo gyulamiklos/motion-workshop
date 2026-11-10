@@ -137,14 +137,18 @@
       city.visible = false;
       stage.add(city);
       const cityFlat = city.add(K.lines(stage, K.cellGrid({ cols: N, rows: N, cell: 1, gap: 0.32, keep: (i, j) => cityKeep[i * N + j] }))).children.at(-1);
-      // the boxes rise in a wave from the landing point; each ring of the wave is born with a pulse
+      // the boxes rise in a wave from the landing point; each ring of the wave is born with a pulse. Hidden-line mode:
+      // each wave carries its own depth-only solids, so a box hides what stands behind it and its own back edges dash.
       const towers = [];
       for (let w = 0; w < 4; w++) {
         const geo = K.cellGrid({ cols: N, rows: N, cell: 1, gap: 0.32, keep: (i, j) => {
           const k = i * N + j, d = Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2);
           return cityH[k] > 0 && d >= w * 7 && d < (w + 1) * 7 + (w === 3 ? 99 : 0);
         }, height: (i, j) => cityH[i * N + j], base: false }); // cityFlat already draws the bases
-        towers.push(city.add(K.lines(stage, geo)).children.at(-1));
+        const wave = new THREE.Group();
+        wave.add(K.occluder(stage, geo.boxes));
+        wave.lines = wave.add(K.lines(stage, geo, { hidden: true })).children.at(-1);
+        towers.push(city.add(wave).children.at(-1));
       }
       const cityFloor = city.add(K.lines(stage, K.gridFloor({ size: N, div: 9 }), { alpha: 0.22 })).children.at(-1);
 
@@ -184,7 +188,7 @@
 
       function draw(t) {
         // fog in each world's own units: the globe (radius 1), then the city (one cell = 1)
-        if (t < T_SWAP) stage.shared.uFog.value.set(2.6, 6.5, 0.3); else stage.shared.uFog.value.set(6, 34, 0.2);
+        if (t < T_SWAP) stage.shared.uFog.value.set(2.6, 6.5, 0.3); else stage.shared.uFog.value.set(5, 22, 0.14);
         // opening
         const flashK = K.flash(t, T_FLASH);
         stage.flash = flashK;
@@ -245,8 +249,10 @@
           if (stage.camera.fov !== c.fov) { stage.camera.fov = c.fov; stage.camera.updateProjectionMatrix(); }
           alt = c.pos.y * CELL;
           towers.forEach((tw, w) => {
-            const tb = T_BUILD + w * 0.32;
-            tw.material.set({ draw: K.span(t, tb, 0.5, "power2.out"), pulse: K.pulse(t, tb, { half: 0.05 }), alpha: 0.9 });
+            const tb = T_BUILD + w * 0.32, rise = K.span(t, tb, 0.45, "expo.out");
+            tw.visible = rise > 0;
+            tw.scale.y = Math.max(0.001, rise);
+            tw.lines.set({ pulse: K.pulse(t, tb, { half: 0.05 }), alpha: 0.9 });
           });
           cityFloor.material.set({ draw: K.span(t, T_SWAP, 0.8) });
         }
