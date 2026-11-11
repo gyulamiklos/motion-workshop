@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Chalk title</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: 'Caveat'; src: url('assets/fonts/Caveat.ttf') format('truetype'); font-weight: 400 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #1e2a26; }
+    </style>
+  </head>
+  <body>
+    <!-- Chapter or film title written on a chalkboard: the kicker is on the board at 0 s, the title is
+         written letter by letter (a wipe from the left inside each letter), a wobbly underline is drawn
+         under it, then the subtitle is written. The chalk edge "boils" (the grain re-poses 8 times a second). -->
+    <div
+      id="kt-root"
+      data-composition-id="chalk-title"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="5"
+      data-composition-variables='[
+        {"id":"kicker","type":"string","label":"Kicker (index or chapter)","default":"1. lecke"},
+        {"id":"title","type":"string","label":"Title","default":"Tiszta függvények"},
+        {"id":"subtitle","type":"string","label":"Subtitle","default":"Ugyanarra a bemenetre mindig ugyanazt adják."},
+        {"id":"accent","type":"color","label":"Accent chalk","default":"#f2d16b"}
+      ]'
+    >
+      <div id="kt-clip" class="clip" data-start="0" data-duration="5" data-track-index="0">
+        <svg width="0" height="0" style="position:absolute">
+          <filter id="kt-chalk" x="-5%" y="-20%" width="110%" height="140%">
+            <feTurbulence id="kt-grain" type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="1" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G" result="d" />
+            <feComponentTransfer in="n" result="holes"><feFuncA type="discrete" tableValues="1 1 1 0.55 1 0.75 1" /></feComponentTransfer>
+            <feComposite in="d" in2="holes" operator="in" />
+          </filter>
+        </svg>
+        <div id="kt-board"></div>
+        <div id="kt-col">
+          <div id="kt-kicker"></div>
+          <div id="kt-title"></div>
+          <svg id="kt-line" width="1200" height="60" viewBox="0 0 1200 60"><path id="kt-under" fill="none" stroke-linecap="round" stroke-width="7" /></svg>
+          <div id="kt-sub"></div>
+        </div>
+      </div>
+
+      <style>
+        #kt-root { position: absolute; inset: 0; font-family: 'Caveat', cursive; }
+        #kt-clip { position: absolute; inset: 0; overflow: hidden; }
+        #kt-board { position: absolute; inset: 0;
+          background:
+            radial-gradient(ellipse 38% 22% at 30% 30%, rgba(237,234,224,0.05) 0%, rgba(237,234,224,0) 70%),
+            radial-gradient(ellipse 30% 18% at 72% 70%, rgba(237,234,224,0.045) 0%, rgba(237,234,224,0) 70%),
+            radial-gradient(ellipse 90% 80% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%),
+            #1e2a26; }
+        #kt-col { position: absolute; left: 220px; top: 50%; transform: translateY(-50%); width: 1480px; display: flex; flex-direction: column; filter: url(#kt-chalk); }
+        #kt-kicker { font-size: 56px; font-weight: 600; color: var(--kt-acc, #f2d16b); }
+        #kt-title { margin-top: 6px; font-size: 168px; font-weight: 700; line-height: 1.0; color: #edeae0; white-space: pre-wrap; }
+        .kt-word { display: inline-block; white-space: nowrap; }
+        .kt-word span { display: inline-block; }
+        #kt-line { margin-top: 4px; overflow: visible; }
+        #kt-sub { margin-top: 24px; font-size: 64px; font-weight: 500; line-height: 1.15; color: rgba(237,234,224,0.78); }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("kt-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+          // letters inside word boxes, so a line only breaks between words
+          function letters(el, text) {
+            var out = [];
+            String(text || "").split(" ").forEach(function (word, i) {
+              if (i) el.appendChild(document.createTextNode(" "));
+              var w = document.createElement("span"); w.className = "kt-word"; el.appendChild(w);
+              word.split("").forEach(function (ch) { var s = document.createElement("span"); s.textContent = ch; w.appendChild(s); out.push(s); });
+            });
+            return out;
+          }
+
+          var v = readVars();
+          var root = document.getElementById("kt-root");
+          root.style.setProperty("--kt-acc", v.accent);
+          document.getElementById("kt-kicker").textContent = v.kicker || "";
+          var title = letters(document.getElementById("kt-title"), v.title);
+          var sub = letters(document.getElementById("kt-sub"), v.subtitle);
+
+          // a hand-drawn underline as long as the title's first row, slightly rising, with a hook at the end
+          var r = rng(7);
+          var lastWord = title.length ? title[title.length - 1].parentNode : null;
+          var w = Math.min(1200, lastWord && lastWord.offsetTop === title[0].parentNode.offsetTop ? lastWord.offsetLeft + lastWord.offsetWidth : 1200);
+          var pts = [], N = 9;
+          for (var i = 0; i <= N; i++) pts.push([8 + (w - 20) * i / N, 36 - i * 1.6 + (r() - 0.5) * 6]);
+          var d = "M" + pts[0][0].toFixed(1) + "," + pts[0][1].toFixed(1);
+          for (i = 1; i < pts.length; i++) {
+            var mx = (pts[i - 1][0] + pts[i][0]) / 2, my = (pts[i - 1][1] + pts[i][1]) / 2;
+            d += " Q" + pts[i - 1][0].toFixed(1) + "," + pts[i - 1][1].toFixed(1) + " " + mx.toFixed(1) + "," + my.toFixed(1);
+          }
+          d += " q14,-4 22,-16";
+          var under = document.getElementById("kt-under");
+          under.setAttribute("d", d); under.setAttribute("stroke", v.accent);
+          var len = under.getTotalLength() || w;
+          gsap.set(under, { strokeDasharray: len, strokeDashoffset: len , opacity: 0 });
+
+          // a wipe inside each letter; the box is padded because Caveat glyphs and accents overhang their advance box
+          var WIPE_FROM = "inset(-60% 130% -40% -30%)", WIPE_TO = "inset(-60% -30% -40% -30%)";
+          var tl = gsap.timeline({ paused: true });
+          var t = 0.3, PER = 0.07;
+          title.forEach(function (c, k) {
+            tl.fromTo(c, { clipPath: WIPE_FROM }, { clipPath: WIPE_TO, duration: PER * 1.6, ease: "none" }, t + k * PER);
+          });
+          t += title.length * PER + 0.1;
+          tl.set(under, { opacity: 1 }, t);
+          tl.to(under, { strokeDashoffset: 0, duration: 0.45, ease: "power2.inOut" }, t);
+          t += 0.4;
+          sub.forEach(function (c, k) {
+            tl.fromTo(c, { clipPath: WIPE_FROM }, { clipPath: WIPE_TO, duration: 0.06, ease: "none" }, t + k * 0.03);
+          });
+          // chalk boil: the grain re-poses every 0.125 s
+          for (var b = 0, s = 2; b < 5; b += 0.125, s++) tl.set("#kt-grain", { attr: { seed: s % 5 + 1 } }, b);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["chalk-title"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>
