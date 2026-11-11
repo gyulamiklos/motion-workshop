@@ -374,6 +374,204 @@ def text_on_path(stage, text, path, to3, mat, size, font, start=0.0, offset=0.35
 def font(path="/usr/share/fonts/truetype/lato/Lato-Black.ttf"):
     return bpy.data.fonts.load(path)
 
+# ---------------------------------------------------------------- flat shapes from distance fields
+# A silhouette (a figure, an icon) as a union of circles and capsules, contoured with marching squares: one smooth
+# outline, whatever the parts. shape_mesh() turns it into a filled mesh plus an outline ribbon (face attribute
+# "edge" = 1), standing in the Blender XZ plane, facing -Y.
+def sd_circle(c, r):
+    return lambda x, y: math.hypot(x - c[0], y - c[1]) - r
+
+def sd_capsule(a, b, r):
+    def f(x, y):
+        bax, bay, pax, pay = b[0] - a[0], b[1] - a[1], x - a[0], y - a[1]
+        h = clamp01((pax * bax + pay * bay) / (bax * bax + bay * bay or 1e-9))
+        return math.hypot(pax - bax * h, pay - bay * h) - r
+    return f
+
+def sd_union(parts, k=0.04):
+    """Smooth union (polynomial smooth-min, blend radius k): parts melt into one body."""
+    def f(x, y):
+        d = parts[0](x, y)
+        for p in parts[1:]:
+            e = p(x, y)
+            h = clamp01(0.5 + 0.5 * (e - d) / k)
+            d = lerp(e, d, h) - k * h * (1 - h)
+        return d
+    return f
+
+def contour(sdf, box, step=0.008):
+    """Closed loops [(x, y), ...] where sdf = 0 inside box (x0, y0, x1, y1), marching squares."""
+    x0, y0, x1, y1 = box
+    nx, ny = int((x1 - x0) / step) + 1, int((y1 - y0) / step) + 1
+    v = [[sdf(x0 + i * step, y0 + j * step) for i in range(nx)] for j in range(ny)]
+    def cross(i0, j0, i1, j1):
+        a, b = v[j0][i0], v[j1][i1]
+        k = a / (a - b)
+        return (round(x0 + (i0 + (i1 - i0) * k) * step, 6), round(y0 + (j0 + (j1 - j0) * k) * step, 6))
+    nxt = {}
+    for j in range(ny - 1):
+        for i in range(nx - 1):
+            c = [v[j][i] < 0, v[j][i + 1] < 0, v[j + 1][i + 1] < 0, v[j + 1][i] < 0]
+            e = {0: (i, j, i + 1, j), 1: (i + 1, j, i + 1, j + 1), 2: (i, j + 1, i + 1, j + 1), 3: (i, j, i, j + 1)}
+            sides = [s for s, (a, b) in zip(range(4), [(0, 1), (1, 2), (3, 2), (0, 3)]) if c[a] != c[b]]
+            pts = [cross(*e[s]) for s in sides]
+            for a, b in zip(pts[0::2], pts[1::2]):  # saddles pair up arbitrarily: fine at this resolution
+                nxt.setdefault(a, []).append(b); nxt.setdefault(b, []).append(a)
+    loops, seen = [], set()
+    for start in nxt:
+        if start in seen: continue
+        loop, prev, cur = [start], None, start
+        seen.add(start)
+        while True:
+            cand = [p for p in nxt[cur] if p != prev and p not in seen]
+            if not cand: break
+            prev, cur = cur, cand[0]
+            seen.add(cur); loop.append(cur)
+        if len(loop) > 8: loops.append(loop[::2])  # every other point: still smooth, half the vertices
+    return loops
+
+def shape_mesh(name, sdf, box, rim=0.012, step=0.008):
+    """A filled mesh of the shape with an inner outline ribbon `rim` wide (face attribute "edge": 1 on the ribbon)."""
+    loops = contour(sdf, box, step)
+    bm = bmesh.new()
+    inner_edges, ribbon = [], []
+    eps = step * 0.5
+    for loop in loops:
+        outer, inner = [], []
+        for (x, y) in loop:
+            gx = (sdf(x + eps, y) - sdf(x - eps, y)) / (2 * eps)
+            gy = (sdf(x, y + eps) - sdf(x, y - eps)) / (2 * eps)
+            g = math.hypot(gx, gy) or 1.0
+            outer.append(bm.verts.new((x, 0.0, y)))
+            inner.append(bm.verts.new((x - gx / g * rim, 0.0, y - gy / g * rim)))
+        n = len(loop)
+        for i in range(n):
+            j = (i + 1) % n
+            ribbon.append(bm.faces.new((outer[i], outer[j], inner[j], inner[i])))
+            inner_edges.append(bm.edges.get((inner[i], inner[j])))
+    fill = bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=inner_edges)["geom"]
+    fill_faces = [f for f in fill if isinstance(f, bmesh.types.BMFace)]
+    bmesh.ops.recalc_face_normals(bm, faces=ribbon + fill_faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me); bm.free()
+    for p in me.polygons:
+        p.use_smooth = False
+    ed = me.attributes.new("edge", "FLOAT", "FACE")
+    nf = len(me.polygons)
+    ed.data.foreach_set("value", [1.0] * len(ribbon) + [0.0] * (nf - len(ribbon)))
+    return me
+
+# ---------------------------------------------------------------- instancing
+def instancer(stage, name, points, variants, attrs=None):
+    """Many copies of a few meshes. points: Three.js positions; variants: meshes, picked per point by the int
+    attribute "var"; attrs: per-point floats ("born" s, "scl" scale, "rot" yaw rad, any other for the shader to read
+    with an INSTANCER attribute). A point shows from its "born" time on: set_time(ob, t) per frame."""
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([tuple(b3(p)) for p in points], [], [])
+    for k, vals in (attrs or {}).items():
+        typ = "INT" if k == "var" else "FLOAT"
+        me.attributes.new(k, typ, "POINT").data.foreach_set("value", vals)
+    ob = stage.link(bpy.data.objects.new(name, me))
+    col = bpy.data.collections.new(name + "_variants")  # not linked to the scene: only its instances render
+    for i, vm in enumerate(variants):
+        col.objects.link(bpy.data.objects.new(f"{name}_v{i}", vm))
+    gn = bpy.data.node_groups.new(name + "_instances", "GeometryNodeTree")
+    gn.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    gn.interface.new_socket("T", in_out="INPUT", socket_type="NodeSocketFloat")
+    gn.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    N, L = gn.nodes, gn.links
+    gi, go = N.new("NodeGroupInput"), N.new("NodeGroupOutput")
+    m2p = N.new("GeometryNodeMeshToPoints")
+    def named(n, typ="FLOAT"):
+        a = N.new("GeometryNodeInputNamedAttribute"); a.data_type = typ; a.inputs["Name"].default_value = n
+        return a.outputs[0]
+    later = N.new("FunctionNodeCompare"); later.data_type = "FLOAT"; later.operation = "GREATER_THAN"
+    L.new(named("born"), later.inputs[0]); L.new(gi.outputs["T"], later.inputs[1])
+    dele = N.new("GeometryNodeDeleteGeometry")
+    ci = N.new("GeometryNodeCollectionInfo")
+    ci.inputs["Collection"].default_value = col
+    ci.inputs["Separate Children"].default_value = True
+    ci.inputs["Reset Children"].default_value = True
+    iop = N.new("GeometryNodeInstanceOnPoints")
+    iop.inputs["Pick Instance"].default_value = True
+    rot = N.new("ShaderNodeCombineXYZ")
+    L.new(named("rot"), rot.inputs["Z"])
+    L.new(gi.outputs[0], m2p.inputs["Mesh"])
+    L.new(m2p.outputs[0], dele.inputs["Geometry"])
+    L.new(later.outputs[0], dele.inputs["Selection"])
+    L.new(dele.outputs[0], iop.inputs["Points"])
+    L.new(ci.outputs[0], iop.inputs["Instance"])
+    L.new(named("var", "INT"), iop.inputs["Instance Index"])
+    L.new(rot.outputs[0], iop.inputs["Rotation"])
+    L.new(named("scl"), iop.inputs["Scale"])
+    L.new(iop.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("instances", "NODES")
+    mod.node_group = gn
+    ob["t_socket"] = gn.interface.items_tree["T"].identifier
+    set_color(ob, WHITE, 0.0)
+    return ob
+
+def set_time(ob, t):
+    """The instancer's clock: points born after t are not there yet."""
+    getattr(ob.modifiers["instances"].properties.inputs, ob["t_socket"]).value = t
+    ob.update_tag()
+
+def time_node(mat):
+    """A Value node "T" in a material, for shaders that compute pulses from the clock; set it with .outputs[0]."""
+    n = mat.node_tree.nodes.get("T") or mat.node_tree.nodes.new("ShaderNodeValue")
+    n.name = "T"
+    return n
+
+def scanline(name, freq=16.0, duty=0.42, edge=1.0, stripe=0.5, fill="#0d0c10", accent="#ff2d8c",
+             fog=(6.0, 45.0, 0.1), pulse_half=0.07):
+    """The striped-silhouette look for shape_mesh() meshes: a bright outline, horizontal stripes (`freq` per unit of
+    height, `duty` lit) and an opaque dark fill that hides what stands behind. An instancer's "born", "shade" and "accent" attributes give
+    each copy a birth pulse, a brightness and whether it takes the accent fill. Per frame: time_node(mat) is the clock,
+    the Value node "ACC" (0..1) how far the "accent" copies are filled."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree; nt.nodes.clear()
+    N, L = nt.nodes, nt.links
+    def math_(op, a, b=None, v=None):
+        n = N.new("ShaderNodeMath"); n.operation = op
+        for i, x in enumerate((a, b)):
+            if x is None: continue
+            if isinstance(x, (int, float)): n.inputs[i].default_value = x
+            else: L.new(x, n.inputs[i])
+        return n.outputs[0]
+    def attr(n, typ):
+        a = N.new("ShaderNodeAttribute"); a.attribute_name = n; a.attribute_type = typ
+        return a.outputs["Fac"]
+    tc = N.new("ShaderNodeTexCoord")
+    sep = N.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
+    frac = math_("FRACT", math_("MULTIPLY", sep.outputs["Z"], freq))
+    lit = math_("LESS_THAN", frac, duty)
+    e = attr("edge", "GEOMETRY")
+    base = math_("ADD", math_("MULTIPLY", e, edge), math_("MULTIPLY", math_("MULTIPLY", lit, math_("SUBTRACT", 1.0, e)), stripe))
+    # birth pulse: 1 + 2 * 0.5^((T - born) / half) once born
+    t = time_node(m).outputs[0]
+    age = math_("SUBTRACT", t, attr("born", "INSTANCER"))
+    pls = math_("MULTIPLY", math_("POWER", 0.5, math_("DIVIDE", math_("MAXIMUM", age, 0.0), pulse_half)), 2.0)
+    shade = attr("shade", "INSTANCER")
+    shade = math_("ADD", math_("MULTIPLY", math_("LESS_THAN", shade, 0.001), 1.0), shade)  # missing = 1
+    camd = N.new("ShaderNodeCameraData")
+    fr = N.new("ShaderNodeMapRange")
+    fr.inputs["From Min"].default_value, fr.inputs["From Max"].default_value = fog[0], fog[1]
+    fr.inputs["To Min"].default_value, fr.inputs["To Max"].default_value = 1.0, fog[2]
+    L.new(camd.outputs["View Distance"], fr.inputs["Value"])
+    white = math_("MULTIPLY", math_("MULTIPLY", math_("MULTIPLY", base, math_("ADD", pls, 1.0)), shade), fr.outputs["Result"])
+    accn = N.new("ShaderNodeValue"); accn.name = "ACC"
+    fill_acc = math_("MULTIPLY", accn.outputs[0], attr("accent", "INSTANCER"))
+    acc = N.new("ShaderNodeEmission"); acc.inputs["Color"].default_value = (*lin(accent), 1)
+    L.new(math_("MULTIPLY", math_("ADD", math_("MULTIPLY", base, 1.5), 1.2), fr.outputs["Result"]), acc.inputs["Strength"])
+    wem = N.new("ShaderNodeEmission"); L.new(white, wem.inputs["Strength"])
+    dark = N.new("ShaderNodeEmission"); dark.inputs["Color"].default_value = (*lin(fill), 1); dark.inputs["Strength"].default_value = 1.0
+    add = N.new("ShaderNodeAddShader"); L.new(wem.outputs[0], add.inputs[0]); L.new(dark.outputs[0], add.inputs[1])
+    mix = N.new("ShaderNodeMixShader"); L.new(fill_acc, mix.inputs[0])
+    L.new(add.outputs[0], mix.inputs[1]); L.new(acc.outputs[0], mix.inputs[2])
+    out = N.new("ShaderNodeOutputMaterial"); L.new(mix.outputs[0], out.inputs["Surface"])
+    return m
+
 # ---------------------------------------------------------------- run
 def run(stage, a, duration, pose, anchors=None):
     """Hook pose(t) into the frame-change handler, then: --open leaves the window with the timeline live; otherwise
