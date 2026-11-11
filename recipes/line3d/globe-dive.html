@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Globe dive</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a090c; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: "JetBrains Mono", monospace; color: #fff; }
+      #gd-fill { position: absolute; inset: 0; background: #0a090c; }
+      #gd-gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+      #gd-hud { position: absolute; inset: 0; pointer-events: none; }
+      .hud { position: absolute; font-size: 15px; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.62); font-variant-numeric: tabular-nums; }
+      .corner { position: absolute; width: 14px; height: 14px; border: 1px solid rgba(255, 255, 255, 0.35); }
+      #gd-title { left: 112px; top: 78px; }
+      #gd-title b { color: #fff; font-weight: 700; }
+      #gd-status { right: 112px; top: 78px; text-align: right; }
+      #gd-readout { right: 112px; bottom: 78px; text-align: right; }
+      #gd-log { left: 112px; top: 150px; width: 540px; border: 1px solid rgba(255, 255, 255, 0.16); padding: 14px 16px 12px; }
+      #gd-log .row { position: relative; height: 25px; line-height: 25px; white-space: nowrap; opacity: 0; }
+      #gd-log .row i { font-style: normal; color: rgba(255, 255, 255, 0.45); margin-right: 14px; }
+      #gd-log .row em { font-style: normal; color: var(--accent, #ff2d8c); }
+      #gd-bar { position: absolute; left: 0; top: 14px; width: 100%; height: 25px; background: var(--accent, #ff2d8c); opacity: 0; mix-blend-mode: screen; }
+      #gd-label { position: absolute; left: 0; top: 0; opacity: 0; }
+      #gd-label span { display: block; padding-left: 8px; color: #fff; white-space: nowrap; }
+      #gd-lead { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="globe-dive"
+      data-composition-variables='[
+        {"id":"accent","type":"color","label":"Accent","default":"#ff2d8c"},
+        {"id":"title","type":"string","label":"Title","default":"WORLD/BUILD"},
+        {"id":"seed","type":"number","label":"Seed","default":11,"min":1,"max":9999,"step":1}
+      ]'
+      data-start="0"
+      data-duration="6.6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="gd-fill"></div>
+      <canvas id="gd-gl" width="1920" height="1080" data-layout-allow-overflow></canvas>
+
+      <div id="gd-hud" data-layout-ignore class="clip" data-start="0" data-duration="6.6" data-track-index="1">
+        <span class="corner" style="left: 96px; top: 64px; border-right: 0; border-bottom: 0"></span>
+        <span class="corner" style="right: 96px; top: 64px; border-left: 0; border-bottom: 0"></span>
+        <span class="corner" style="left: 96px; bottom: 64px; border-right: 0; border-top: 0"></span>
+        <span class="corner" style="right: 96px; bottom: 64px; border-left: 0; border-top: 0"></span>
+        <div id="gd-title" class="hud"><b data-var-text="title">WORLD/BUILD</b> &nbsp;·&nbsp; boot sequence</div>
+        <div id="gd-status" class="hud">t = <span id="gd-time">0.000</span> s<br />regions <span id="gd-count">0</span> / 4</div>
+        <div id="gd-readout" class="hud">r = 1.000 u &nbsp;·&nbsp; tilt 23.4°<br /><span id="gd-alt">alt 3.100 u</span></div>
+        <div id="gd-log" class="hud">
+          <div id="gd-bar"></div>
+          <div id="gd-r0" class="row"><i>0.000</i>mount /world &nbsp;ok</div>
+          <div id="gd-r1" class="row"><i>0.412</i>draw graticule (12 × 18) &nbsp;ok</div>
+          <div id="gd-r2" class="row"><i>1.700</i>raise region 01 &nbsp;<em>new</em></div>
+          <div id="gd-r3" class="row"><i>2.350</i>raise region 02 &nbsp;<em>new</em></div>
+          <div id="gd-r4" class="row"><i>3.000</i>raise region 03 &nbsp;<em>new</em></div>
+          <div id="gd-r5" class="row"><i>3.650</i>raise region 04 &nbsp;<em>new</em></div>
+          <div id="gd-r6" class="row"><i>4.250</i>descend to region 04 …</div>
+          <div id="gd-r7" class="row"><i>5.050</i>stream blocks (local) &nbsp;ok</div>
+        </div>
+        <svg id="gd-lead" viewBox="0 0 1920 1080"><polyline id="gd-leadline" points="" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1" /></svg>
+        <div id="gd-label" class="hud"><span id="gd-labeltext">REGION 01</span></div>
+      </div>
+
+      <div id="gd-drv" class="clip" data-start="0" data-duration="6.6" data-track-index="0" style="position: absolute; width: 1px; height: 1px; opacity: 0"></div>
+    </div>
+
+    <script>
+      window.__hf = window.__hf || {};
+      window.__hf.buildReady = window.__hf.buildReady || {};
+      window.__hf.buildReady["globe-dive"] = new Promise((res) => (window.__gdReady = res));
+    </script>
+    <script type="module">
+      import * as K from "./assets/line3d.js";
+      const { THREE } = K;
+      const COMP = "globe-dive", DUR = 6.6;
+      const vars = window.__hyperframes?.getVariables?.() ?? {};
+      const ACCENT = typeof vars.accent === "string" ? vars.accent : "#ff2d8c";
+      const SEED = Number(vars.seed) || 11;
+      document.getElementById("root").style.setProperty("--accent", ACCENT);
+
+      const stage = K.createStage(document.getElementById("gd-gl"), { look: { accent: ACCENT } });
+
+      // ---- beats (s)
+      const T_SEED = 0.0, T_FLASH = 0.3, T_GRAT = 0.42, BEAT = 0.65, T_REG = [1.7, 1.7 + BEAT, 1.7 + 2 * BEAT, 1.7 + 3 * BEAT];
+      const T_DIVE = 4.25, D_DIVE = 0.62, T_SWAP = T_DIVE + D_DIVE, T_BUILD = 5.05;
+      const SPIN = THREE.MathUtils.degToRad(12); // the globe turns 12°/s, slowing to a stop over the dive
+      const TILT = THREE.MathUtils.degToRad(23.4);
+
+      // ---- the globe
+      const globe = new THREE.Group(); // tilt
+      const spinner = new THREE.Group(); // spin
+      globe.rotation.z = TILT;
+      globe.add(spinner);
+      stage.add(globe);
+      const grat = spinner.add(K.lines(stage, K.sphereLatLong({ radius: 1, lat: 12, lon: 18 }), { alpha: 1, glow: 0.1 })).children.at(-1);
+      const equator = spinner.add(K.lines(stage, K.sphereLatLong({ radius: 1.0, lat: 2, lon: 0, segments: 256 }), { alpha: 0.5 })).children.at(-1);
+      const CELL = 0.042;
+      // Each region faces the camera when it is born: its longitude is chosen in view space (lon 0 = facing the
+      // camera) and the spin up to its birth is taken off. Region 04 is also the dive target, so it faces us at T_DIVE.
+      const VIEW = [[0.72, -0.55], [-0.22, 0.42], [-0.45, -0.3], [0.12, 0.02]];
+      const REG_CENTRES = VIEW.map(([lat, lon], i) => [lat, (((lon - SPIN * T_REG[i]) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)]);
+      const regions = K.blobRegions({ seed: SEED, count: 4, size: 0.5, centres: REG_CENTRES });
+      const regionLines = regions.map((rg) =>
+        spinner.add(K.lines(stage, K.sphereCells({ radius: 1.003, cell: CELL, gap: 0.32, mask: rg.mask, order: (la, lo) => rg.dist(la, lo) / (rg.size * 1.6) }), { draw: 0 })).children.at(-1),
+      );
+
+      // the opening: a live point, rings that open from it
+      // Rings open from the point facing the camera, then tilt down onto the globe's latitudes and cool to white.
+      const seedPt = stage.add(K.points(stage, new Float32Array([0, 0, 0]), { size: 16, sizes: [1], alpha: 1, glow: 1 }));
+      const RING_LAT = [0, Math.PI / 6, -Math.PI / 6], RING_R0 = [2.9, 1.9, 1.35]; // they land on the graticule's own latitudes
+      const rings = RING_LAT.map(() => globe.add(K.lines(stage, K.ring({ radius: 1, segments: 256 }), { alpha: 1, glow: 0.4 })).children.at(-1));
+      const sparks = stage.add(K.lines(stage, K.warp({ count: 260, radius: 1.8, depth: 2.5, length: 0.5, seed: SEED + 1 }), { alpha: 0.9, glow: 0.3 }));
+      sparks.position.z = 1.2;
+
+      // ---- the world under the surface: cells at the same angular pitch, continued as a flat grid
+      // Dive target: the cell centre nearest to region 04's centre, so the flat grid lines up with the sphere's cells.
+      const R4 = regions[3];
+      const { lat: LAT0, lon: LON0 } = K.cellCentre(R4.lat, R4.lon, CELL);
+      const SCALE = 1 / CELL; // city units: one cell = 1
+      const N = 81, rnd = K.mulberry32(SEED + 3);
+      const cityKeep = [], cityH = [];
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+        const lat = LAT0 + ((N - 1) / 2 - j) * CELL, lon = LON0 + (i - (N - 1) / 2) * CELL;
+        const land = R4.mask(lat, lon) || regions.some((r) => r.mask(lat, lon));
+        const k = i * N + j;
+        cityKeep[k] = land || rnd() < 0.0;
+        cityH[k] = land && rnd() < 0.22 ? 0.3 + Math.pow(rnd(), 2.4) * 2.0 : 0;
+      }
+      const city = new THREE.Group();
+      city.visible = false;
+      stage.add(city);
+      const cityFlat = city.add(K.lines(stage, K.cellGrid({ cols: N, rows: N, cell: 1, gap: 0.32, keep: (i, j) => cityKeep[i * N + j] }))).children.at(-1);
+      // the boxes rise in a wave from the landing point; each ring of the wave is born with a pulse. Hidden-line mode:
+      // each wave carries its own depth-only solids, so a box hides what stands behind it and its own back edges dash.
+      const towers = [];
+      for (let w = 0; w < 4; w++) {
+        const geo = K.cellGrid({ cols: N, rows: N, cell: 1, gap: 0.32, keep: (i, j) => {
+          const k = i * N + j, d = Math.hypot(i - (N - 1) / 2, j - (N - 1) / 2);
+          return cityH[k] > 0 && d >= w * 7 && d < (w + 1) * 7 + (w === 3 ? 99 : 0);
+        }, height: (i, j) => cityH[i * N + j], base: false }); // cityFlat already draws the bases
+        const wave = new THREE.Group();
+        wave.add(K.occluder(stage, geo.boxes));
+        wave.lines = wave.add(K.lines(stage, geo, { hidden: true })).children.at(-1);
+        towers.push(city.add(wave).children.at(-1));
+      }
+      const cityFloor = city.add(K.lines(stage, K.gridFloor({ size: N, div: 9 }), { alpha: 0.22 })).children.at(-1);
+
+      // ---- camera
+      const camGlobe = K.cameraRig([
+        { t: 0, pos: [-0.2, 0.15, 3.0], target: [-0.2, 0.0, 0], fov: 40 },
+        { t: 1.3, pos: [-0.5, 0.25, 3.6], target: [-0.74, 0.02, 0], fov: 40, ease: "expo.out" },
+        { t: T_DIVE, pos: [-0.45, 0.3, 3.3], target: [-0.68, 0.04, 0], fov: 40, ease: "sine.inOut" },
+      ], { drift: 0.035, seed: SEED });
+      const camCity = K.cameraRig([
+        { t: T_SWAP, pos: [0, 0, 0], target: [0, 0, 0] }, // replaced at run time by the swap pose
+        { t: T_SWAP + 0.55, pos: [0, 6.2, 2.6], target: [0, 0, -1.2], fov: 40, ease: "expo.out" },
+        { t: DUR, pos: [0.8, 4.4, -1.4], target: [1.6, 0, -8], fov: 44, ease: "sine.inOut" },
+      ], { drift: 0.06, seed: SEED + 9 });
+
+      const spinAngle = (t) => {
+        if (t < T_DIVE) return SPIN * t;
+        const k = Math.min(1, (t - T_DIVE) / D_DIVE);
+        return SPIN * (T_DIVE + D_DIVE * (k - (k * k) / 2));
+      };
+
+      // surface frame of the dive target in world space at time t
+      const tmpM = new THREE.Matrix4();
+      function surfaceFrame(t) {
+        spinner.rotation.y = spinAngle(t);
+        globe.updateMatrixWorld(true);
+        tmpM.copy(spinner.matrixWorld);
+        const lat = LAT0, lon = LON0;
+        const n = new THREE.Vector3(Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon));
+        const north = new THREE.Vector3(-Math.sin(lat) * Math.sin(lon), Math.cos(lat), -Math.sin(lat) * Math.cos(lon));
+        return { p: n.clone().applyMatrix4(tmpM), n: n.transformDirection(tmpM), north: north.transformDirection(tmpM) };
+      }
+      const SWAP_H = 0.34; // height above the surface at the swap (one cell ≈ 185 px)
+
+      const timeEl = document.getElementById("gd-time"), countEl = document.getElementById("gd-count"), altEl = document.getElementById("gd-alt");
+      const label = document.getElementById("gd-label"), labelText = document.getElementById("gd-labeltext"), lead = document.getElementById("gd-leadline");
+
+      function draw(t) {
+        // fog in each world's own units: the globe (radius 1), then the city (one cell = 1)
+        if (t < T_SWAP) stage.shared.uFog.value.set(2.6, 6.5, 0.3); else stage.shared.uFog.value.set(5, 22, 0.14);
+        // opening
+        const flashK = K.flash(t, T_FLASH);
+        stage.flash = flashK;
+        seedPt.visible = t < T_GRAT + 0.5;
+        seedPt.material.set({ alpha: 1 - K.span(t, T_FLASH + 0.1, 0.4), hold: 1, size: 16 + 30 * K.pulse(t, T_FLASH, { half: 0.06 }) });
+        rings.forEach((rg, i) => {
+          const open = K.span(t, T_FLASH + i * 0.04, 0.35, "expo.out"); // 0 -> its wide radius
+          const land = K.span(t, T_FLASH + 0.45 + i * 0.08, 0.7, "power3.inOut"); // wide -> onto its latitude
+          const lat = RING_LAT[i], r = K.lerp(0.05 + open * RING_R0[i], Math.cos(lat), land);
+          rg.visible = t >= T_FLASH && t < T_GRAT + 1.4;
+          rg.scale.setScalar(r);
+          rg.rotation.set(K.lerp(-TILT * 0, Math.PI / 2, land), 0, -TILT * (1 - land));
+          rg.position.set(0, Math.sin(lat) * land, 0);
+          rg.material.set({ hold: 1 - K.span(t, T_FLASH + 0.9, 0.4), alpha: 1 - K.span(t, T_GRAT + 0.9, 0.45) });
+        });
+        const sp = K.span(t, T_FLASH, 0.5, "expo.out");
+        sparks.visible = t >= T_FLASH && t < T_FLASH + 0.6;
+        sparks.scale.set(0.3 + sp * 1.6, 0.3 + sp * 1.6, 1 + sp * 2);
+        sparks.material.set({ draw: 1, hold: 0.6, alpha: 0.9 * (1 - K.span(t, T_FLASH + 0.1, 0.45)) });
+
+        // globe
+        spinner.rotation.y = spinAngle(t);
+        const gd = K.span(t, T_GRAT, 1.1, "power2.out");
+        const fade = 1 - K.span(t, T_SWAP - 0.25, 0.25);
+        grat.material.set({ draw: gd, alpha: 0.92 * fade });
+        equator.material.set({ draw: K.span(t, T_GRAT + 0.6, 0.6, "power2.out"), alpha: 0.5 * fade });
+        globe.visible = t < T_SWAP;
+        let born = 0;
+        regionLines.forEach((rl, i) => {
+          rl.material.set({ draw: K.span(t, T_REG[i], 0.12, "power2.out"), pulse: K.pulse(t, T_REG[i]), alpha: 0.85 });
+          if (t >= T_REG[i]) born++;
+        });
+
+        // camera
+        let alt;
+        if (t < T_DIVE) {
+          stage.setCamera(camGlobe(t));
+          alt = stage.camera.position.length() - 1;
+        } else if (t < T_SWAP) {
+          const f = surfaceFrame(t);
+          const c = K.dive((t - T_DIVE) / D_DIVE, camGlobe(t), f.p, f.n, f.north, SWAP_H);
+          stage.setCamera(c);
+          alt = c.pos.length() - 1;
+        }
+        city.visible = t >= T_SWAP;
+        if (t >= T_SWAP) {
+          // the same view, one cell = 1 unit: straight down from SWAP_H * SCALE, north = -Z
+          const c = camCity(t);
+          const k0 = { pos: new THREE.Vector3(0, SWAP_H * SCALE, 0), target: new THREE.Vector3(0, 0, 0) };
+          const kk = K.span(t, T_SWAP, 0.55, "expo.out");
+          if (t < T_SWAP + 0.55) {
+            const b = camCity(T_SWAP + 0.55);
+            c.pos.copy(k0.pos).lerp(b.pos, kk); c.target.copy(k0.target).lerp(b.target, kk);
+          }
+          stage.camera.up.set(0, 0, -1).lerp(new THREE.Vector3(0, 1, 0), K.span(t, T_SWAP, 0.7, "power2.inOut")).normalize();
+          stage.camera.position.copy(c.pos);
+          stage.camera.lookAt(c.target);
+          if (stage.camera.fov !== c.fov) { stage.camera.fov = c.fov; stage.camera.updateProjectionMatrix(); }
+          alt = c.pos.y * CELL;
+          towers.forEach((tw, w) => {
+            const tb = T_BUILD + w * 0.32, rise = K.span(t, tb, 0.45, "expo.out");
+            tw.visible = rise > 0;
+            tw.scale.y = Math.max(0.001, rise);
+            tw.lines.set({ pulse: K.pulse(t, tb, { half: 0.05 }), alpha: 0.9 });
+          });
+          cityFloor.material.set({ draw: K.span(t, T_SWAP, 0.8) });
+        }
+
+        // HUD numbers and the leader label on the newest region
+        timeEl.textContent = t.toFixed(3);
+        countEl.textContent = born;
+        altEl.textContent = "alt " + Math.max(0, alt).toFixed(3) + " u";
+        const li = born - 1;
+        if (li >= 0 && t < T_DIVE + 0.2) {
+          const p = regions[li].point(1.0).applyMatrix4(spinner.matrixWorld);
+          const s = stage.project(p);
+          const side = s.x > 1450 ? -1 : 1, lx = s.x + side * 120 - (side < 0 ? 210 : 0), ly = s.y - 90;
+          lead.setAttribute("points", `${s.x},${s.y} ${s.x + side * 40},${ly} ${side < 0 ? lx + 210 : lx},${ly}`);
+          label.style.transform = `translate(${lx}px, ${ly - 11}px)`;
+          labelText.textContent = "REGION 0" + (li + 1) + "  ·  " + (180 + li * 37) + " cells";
+          const on = Math.min(1, (t - T_REG[li]) / 0.08) * (1 - K.span(t, T_DIVE, 0.2));
+          label.style.opacity = on; lead.style.opacity = on;
+        } else { label.style.opacity = 0; lead.style.opacity = 0; }
+
+        stage.render();
+      }
+
+      // ---- timeline: a driver tween calls draw(t) on every seek; HUD rows on the same beats
+      const driver = { _t: 0 };
+      Object.defineProperty(driver, "t", { get() { return this._t; }, set(v) { this._t = v; draw(v); } });
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(driver, { t: 0 }, { t: DUR, duration: DUR, ease: "none", immediateRender: false }, 0);
+      const rowT = [0.05, T_GRAT, ...T_REG, T_DIVE, T_BUILD];
+      rowT.forEach((rt, i) => {
+        tl.fromTo("#gd-r" + i, { opacity: 0 }, { opacity: 1, duration: 0.05, ease: "none" }, rt);
+        tl.to("#gd-bar", { y: i * 25, opacity: 0.32, duration: 0.06, ease: "power2.out" }, rt);
+        tl.to("#gd-bar", { opacity: 0.14, duration: 0.25, ease: "power1.out" }, rt + 0.06);
+      });
+      tl.fromTo("#gd-log", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0);
+      tl.to("#gd-log", { opacity: 0, x: -24, duration: 0.25, ease: "power2.in" }, T_SWAP - 0.1);
+      window.__timelines = window.__timelines || {};
+      window.__timelines[COMP] = tl;
+
+      draw(0);
+      await stage.renderer.compileAsync(stage.scene, stage.camera);
+      window.__gdReady();
+    </script>
+  </body>
+</html>

@@ -12,13 +12,13 @@ The reader sees the whole line at once, so their eye never has to hunt for the n
 ## Motion core (measured at 60 fps)
 - **Line entrance:** every word at once, grey `#8f8a90`, `scaleX ≈ 0.58` about the word's centre. Lands in 1–2 frames with a slight blur, cutting straight in over the previous line (no reveal).
 - **Word activation, three layers starting together:**
-  - `scaleX 0.58 → 1` about the centre in **~0.15 s (8–9 frames)**, decelerating. The word's centre does not move: in the reference, "trees" grew from 133 px to 232 px around the same centre.
+  - `scaleX 0.58 → 1` about the centre in **~0.15 s (8–9 frames)**, decelerating. The word's centre does not move: in the studied footage a word grew from 133 px to 232 px around the same centre.
   - Accent `#ff2d8c` sweeps through the letters over **~65 % of the word's sung length**: "trees" took 8 of 14 frames, "interesting" 28 of 36. Each letter changes in one frame.
   - A soft accent glow: a text shadow of about 14 px at 35 % and a radial bloom behind the word.
 - **Hand-off:** the next word's sweep starts first. About **2 frames (0.035 s) later** the previous word snaps to white `#f5f1ea` in one frame and its glow fades out over ~0.2 s.
 - **Accent words** (the line's keyword) keep the accent colour after they are sung.
-- **Variant without squeeze** (the 2:42 instance of the reference): the same sweep and hand-off with `scaleX = 1`. It is calmer and suits longer lines.
-- **Optional extras seen in the reference, not built:** a 1-frame accent scanline across the frame on the line change; a short tracking "breath" (letter spacing ±) on strong beats; a sung word glitching into a glyph and then a cursor bar.
+- **Variant without squeeze** (a second instance in the studied footage): the same sweep and hand-off with `scaleX = 1`. It is calmer and suits longer lines.
+- **Optional extras seen in the studied footage, not built:** a 1-frame accent scanline across the frame on the line change; a short tracking "breath" (letter spacing ±) on strong beats; a sung word glitching into a glyph and then a cursor bar.
 
 ## Parameters
 | Parameter | Value | Push up | Push down |
@@ -41,4 +41,4 @@ The reader sees the whole line at once, so their eye never has to hunt for the n
 - The accent must hold contrast against the background (the `check` contrast pass); a mid-grey future colour on a light brand background disappears.
 
 ## Reference
-`research/simulation-ending/` (local, never committed): `source.mp4` 0:40.4–0:41.6 (squeeze variant) and 2:41.6–2:44 (no squeeze). Measured with `breakdown.sh` and an accent-pixel tracker on the text strip. Our render: word hand-offs within 1–2 frames of the reference at 60 fps.
+Measured with `breakdown.sh` and an accent-pixel tracker on the text strip. Our render: word hand-offs within 1–2 frames of the studied footage at 60 fps.

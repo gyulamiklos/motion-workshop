@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Skybox room</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a090c; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: "JetBrains Mono", monospace; color: #fff; }
+      #sr-fill { position: absolute; inset: 0; background: #0a090c; }
+      #sr-gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+      #sr-hud { position: absolute; inset: 0; pointer-events: none; }
+      .hud { position: absolute; font-size: 15px; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.62); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .corner { position: absolute; width: 14px; height: 14px; border: 1px solid rgba(255, 255, 255, 0.35); }
+      #sr-title { left: 112px; top: 78px; }
+      #sr-title b { color: #fff; font-weight: 700; }
+      #sr-status { right: 112px; top: 78px; text-align: right; }
+      #sr-readout { right: 112px; bottom: 78px; text-align: right; }
+      #sr-readout b { display: block; font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 0.02em; }
+      #sr-readout b.cap { color: var(--accent, #ff2d8c); }
+      .axis { position: absolute; left: 0; top: 0; font-size: 13px; color: rgba(255, 255, 255, 0.5); }
+      .axis b { font-size: 22px; color: rgba(255, 255, 255, 0.85); margin-right: 8px; }
+      .tag { position: absolute; left: 0; top: 0; opacity: 0; font-size: 13px; color: #fff; }
+      .tag em { font-style: normal; color: var(--accent, #ff2d8c); }
+      #sr-lead { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; }
+      #sr-band { position: absolute; left: 0; top: 0; font-size: 13px; color: rgba(255, 255, 255, 0.8); opacity: 0; }
+      #sr-font { position: absolute; left: 0; top: 0; opacity: 0; font-family: "Archivo Black", sans-serif; font-size: 20px; }
+      #sr-band em { font-style: normal; color: var(--accent, #ff2d8c); margin-left: 18px; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="skybox-room"
+      data-composition-variables='[
+        {"id":"accent","type":"color","label":"Accent","default":"#ff2d8c"},
+        {"id":"line","type":"string","label":"Text on the curve","default":"every request climbs until it meets the limit, and the limit holds"},
+        {"id":"limit","type":"number","label":"Limit (requests/s)","default":12000,"min":100,"max":10000000,"step":100},
+        {"id":"seed","type":"number","label":"Seed","default":5,"min":1,"max":9999,"step":1}
+      ]'
+      data-start="0"
+      data-duration="8.6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="sr-fill"></div>
+      <div id="sr-font" aria-hidden="true">every request climbs</div>
+      <canvas id="sr-gl" width="1920" height="1080" data-layout-allow-overflow></canvas>
+
+      <div id="sr-hud" data-layout-ignore class="clip" data-start="0" data-duration="8.6" data-track-index="1">
+        <span class="corner" style="left: 96px; top: 64px; border-right: 0; border-bottom: 0"></span>
+        <span class="corner" style="right: 96px; top: 64px; border-left: 0; border-bottom: 0"></span>
+        <span class="corner" style="left: 96px; bottom: 64px; border-right: 0; border-top: 0"></span>
+        <span class="corner" style="right: 96px; bottom: 64px; border-left: 0; border-top: 0"></span>
+        <div id="sr-title" class="hud"><b>SANDBOX</b> &nbsp;·&nbsp; room 02 &nbsp;·&nbsp; inside view</div>
+        <div id="sr-status" class="hud">t = <span id="sr-time">0.000</span> s<br />nodes <span id="sr-count">0</span> / 4</div>
+        <div id="sr-readout" class="hud">throughput<b id="sr-rate">0 rps</b></div>
+        <div id="sr-ax0" class="axis"><b>−Z</b>back wall · 2 400 pts</div>
+        <div id="sr-ax1" class="axis"><b>+X</b>east wall</div>
+        <div id="sr-ax2" class="axis"><b>−Y</b>floor</div>
+        <svg id="sr-lead" viewBox="0 0 1920 1080"></svg>
+        <div id="sr-t0" class="tag">node 01 · <em>up</em> 41 ms</div>
+        <div id="sr-t1" class="tag">node 02 · <em>up</em> 38 ms</div>
+        <div id="sr-t2" class="tag">node 03 · <em>up</em> 44 ms</div>
+        <div id="sr-t3" class="tag">node 04 · <em>up</em> 40 ms</div>
+        <div id="sr-band" class="hud">LIMIT · <span id="sr-limit">12 000</span> rps<em>hard cap</em></div>
+      </div>
+
+      <div id="sr-drv" class="clip" data-start="0" data-duration="8.6" data-track-index="0" style="position: absolute; width: 1px; height: 1px; opacity: 0"></div>
+    </div>
+
+    <script>
+      window.__hf = window.__hf || {};
+      window.__hf.buildReady = window.__hf.buildReady || {};
+      window.__hf.buildReady["skybox-room"] = new Promise((res) => (window.__srReady = res));
+    </script>
+    <script type="module">
+      import * as K from "./assets/line3d.js";
+      const { THREE } = K;
+      const COMP = "skybox-room", DUR = 8.6;
+      const vars = window.__hyperframes?.getVariables?.() ?? {};
+      const ACCENT = typeof vars.accent === "string" ? vars.accent : "#ff2d8c";
+      const LINE = typeof vars.line === "string" && vars.line.trim() ? vars.line : "every request climbs until it meets the limit, and the limit holds";
+      const LIMIT = Number(vars.limit) || 12000;
+      const SEED = Number(vars.seed) || 5;
+      document.getElementById("root").style.setProperty("--accent", ACCENT);
+      const fmt = (n) => Math.round(n).toLocaleString("en-US").replace(/,/g, " ");
+      document.getElementById("sr-limit").textContent = fmt(LIMIT);
+
+      const stage = K.createStage(document.getElementById("sr-gl"), { look: { accent: ACCENT, background: "#121116" } });
+      stage.shared.uFog.value.set(3, 15, 0.22);
+
+      // ---- beats (s)
+      const T_WHIP = 1.9, D_WHIP = 0.4; // turn to the corner
+      const BEAT = 0.65, T_NODE = [2.65, 2.65 + BEAT, 2.65 + 2 * BEAT, 2.65 + 3 * BEAT];
+      const T_BACK = 5.15, D_BACK = 0.45; // turn back to the wall that carries the graph
+      const T_RUN = 5.75, D_RUN = 1.5, T_HIT = T_RUN + D_RUN; // the head runs up the curve and meets the limit
+
+      // ---- the room: edges, a faint grid on the walls, dust painted on them
+      const RW = 8, RH = 4.5, RD = 10;
+      const room = new THREE.Group();
+      stage.add(room);
+      const edges = room.add(K.lines(stage, K.box({ w: RW, h: RH, d: RD }), { alpha: 0.85 })).children.at(-1);
+      const grid = room.add(K.lines(stage, K.wallGrid({ w: RW, h: RH, d: RD, div: 9 }), { alpha: 0.13 })).children.at(-1);
+      const dust = room.add(K.points(stage, K.scatter(3600, { kind: "walls", w: RW, h: RH, d: RD, seed: SEED }), { size: 2.6, alpha: 1, seed: SEED + 1 })).children.at(-1);
+
+      // ---- the corner after the whip: east wall (+X) meets the back wall (-Z) and the floor
+      // Nodes are born where the camera looks after the turn (on the east wall, near the corner), so each faces it.
+      const NODE_P = [[4, 0.9, -2.2], [4, -0.2, -3.6], [4, 1.3, -4.3], [4, -1.05, -2.9]].map((p) => new THREE.Vector3(...p));
+      const nodes = NODE_P.map((p) => {
+        const pt = room.add(K.points(stage, new Float32Array([p.x - 0.01, p.y, p.z]), { size: 22, sizes: [1], alpha: 1, glow: 0.8 })).children.at(-1);
+        const rg = room.add(K.lines(stage, K.ring({ radius: 1, segments: 96 }), { alpha: 0.9, glow: 0.2 })).children.at(-1);
+        rg.position.copy(p).x -= 0.02; rg.rotation.y = -Math.PI / 2; // lies on the east wall
+        return { pt, rg };
+      });
+
+      // ---- the graph on the back wall: axes, the limit band, the curve, the text riding it
+      const G = new THREE.Group(); // local XY = the wall, origin at the graph's lower-left
+      G.position.set(-3.1, -1.75, -RD / 2 + 0.01);
+      room.add(G);
+      const GW = 6.4, CAP = 3.0; // graph width, limit height
+      const axes = G.add(K.lines(stage, K.path([[0, CAP + 0.5, 0], [0, 0, 0], [GW, 0, 0]]), { alpha: 0.7 })).children.at(-1);
+      const band = G.add(K.lines(stage, K.hatch({ w: GW, h: 0.32, step: 0.09 }), { alpha: 0.35 })).children.at(-1);
+      band.position.y = CAP;
+      const capLine = G.add(K.lines(stage, K.path([[0, CAP, 0], [GW, CAP, 0]]), { alpha: 1, glow: 0.2 })).children.at(-1);
+      // an S-curve that leaves the floor slowly, climbs, and meets the cap at X_HIT, then runs along it
+      const X_HIT = 3.5, pts = [];
+      for (let i = 0; i <= 120; i++) {
+        const x = (i / 120) * GW;
+        const y = x < X_HIT ? CAP * (1 - Math.cos(Math.pow(x / X_HIT, 1.6) * Math.PI / 2)) : CAP;
+        pts.push(new THREE.Vector3(x, Math.max(0.05, y), 0));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
+      let U_HIT = 0; // where the curve reaches the cap, 0..1 along it
+      for (let k = 0; k <= 400; k++) if (curve.getPointAt(k / 400).y < CAP - 1e-3) U_HIT = k / 400;
+      const curveLine = G.add(K.lines(stage, K.path(curve.getSpacedPoints(300).map((v) => [v.x, v.y, 0])), { alpha: 1, draw: 0 })).children.at(-1);
+      const head = G.add(K.points(stage, new Float32Array([0, 0, 0.01]), { size: 14, sizes: [1], alpha: 1, glow: 1 })).children.at(-1);
+      const drop = G.add(K.lines(stage, K.path([[0, 0, 0], [0, 1, 0]]), { alpha: 0.6 })).children.at(-1);
+      const text = await K.textPath(stage, LINE, curve, { size: 0.21, start: 0.02, offset: 0.35 });
+      G.add(text);
+
+      // ---- camera: push to the back wall, whip to the corner, turn back to the graph, push in on the hit
+      // Angles are aimed from the geometry: after the whip the camera looks into the east/back corner with the nodes
+      // in frame; the graph keys look at the graph's centre (0.1, 0, -5), the hit keys at the hit point (0.4, 1.25, -5).
+      const cam = K.cameraRig([
+        { t: 0, pos: [0, 0.1, 4.2], dir: [0, 0], fov: 50 },
+        // a small counter-move before the whip (the studied footage drifts the other way for ~0.1 s)
+        { t: T_WHIP, pos: [0.2, 0.0, 2.4], dir: [7, 0], roll: -0.05, fov: 50, ease: "sine.inOut" },
+        { t: T_WHIP + D_WHIP, pos: [-1.8, -0.4, 2.8], dir: [-46, 1], roll: 0.78, fov: 50, ease: "power4.inOut" },
+        { t: T_BACK, pos: [-1.6, -0.35, 2.4], dir: [-44, 1], roll: 0.6, fov: 50, ease: "sine.out" },
+        { t: T_BACK + D_BACK, pos: [-1.4, -0.3, 1.4], dir: [-14, -1.5], roll: -0.04, fov: 46, ease: "power4.inOut" },
+        { t: T_HIT, pos: [-1.1, -0.2, 0.8], dir: [-12.5, -1], roll: -0.03, fov: 46, ease: "sine.inOut" },
+        // the hit: a fast push and roll toward the point (≈ 0.12 s), then it settles
+        { t: T_HIT + 0.14, pos: [-0.6, 0.45, -1.2], dir: [-12, 11], roll: 0.18, fov: 42, ease: "power3.out" },
+        { t: DUR, pos: [-0.55, 0.5, -1.45], dir: [-13, 11.5], roll: 0.14, fov: 42, ease: "sine.out" },
+      ], { drift: 0.025, seed: SEED });
+      // motion blur over each whip; its gain swells and falls with the turn's speed, so the brightness never jumps
+      const whipK = (t) => [[T_WHIP, D_WHIP], [T_BACK, D_BACK]].map(([t0, d]) => (t - t0) / d).find((k) => k > 0 && k < 1);
+
+      const $ = (id) => document.getElementById(id);
+      const timeEl = $("sr-time"), countEl = $("sr-count"), rateEl = $("sr-rate"), bandEl = $("sr-band"), lead = $("sr-lead");
+      const axEls = [$("sr-ax0"), $("sr-ax1"), $("sr-ax2")];
+      const AX_P = [new THREE.Vector3(-3.6, 1.9, -RD / 2), new THREE.Vector3(RW / 2, 1.9, -1.2), new THREE.Vector3(1.4, -RH / 2, -2.2)];
+      const tags = [0, 1, 2, 3].map((i) => $("sr-t" + i));
+      lead.innerHTML = tags.map((_, i) => `<polyline id="sr-l${i}" points="" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1" />`).join("");
+      const leads = tags.map((_, i) => $("sr-l" + i));
+      const wp = new THREE.Vector3();
+
+      // pose(t): the scene and the camera at t, no render (the motion blur calls it for each shutter sample)
+      function pose(t) {
+        const c = cam(t);
+        stage.setCamera(c);
+        stage.flash = K.flash(t, T_HIT, { lift: 0.32, half: 0.06 });
+        // the room draws on in the first second; dust is there from the start
+        edges.set({ draw: K.span(t, 0.0, 0.9, "power2.out") });
+        grid.set({ draw: K.span(t, 0.3, 1.0, "power2.out") });
+        dust.set({ alpha: K.span(t, 0, 0.6) });
+        nodes.forEach(({ pt, rg }, i) => {
+          const on = t >= T_NODE[i];
+          pt.visible = on;
+          pt.set({ pulse: K.pulse(t, T_NODE[i]), hold: 0.35, size: 22 + 26 * K.pulse(t, T_NODE[i], { half: 0.05 }) });
+          // a reticle opens around the new node and collapses to it
+          const k = K.span(t, T_NODE[i], 0.5, "expo.out");
+          rg.visible = on && k < 1;
+          rg.scale.setScalar(0.05 + 0.7 * Math.sin(k * Math.PI));
+          rg.set({ pulse: K.pulse(t, T_NODE[i]), alpha: 0.9 * (1 - k) });
+        });
+        // the graph
+        const run = K.span(t, T_RUN, D_RUN, "power2.in");
+        const u = Math.min(U_HIT, run * U_HIT) + Math.max(0, t - T_HIT) * 0.06; // after the hit it creeps along the cap
+        const uu = Math.min(0.995, u);
+        const hp = curve.getPointAt(uu);
+        const gOn = K.span(t, T_BACK - 0.2, 0.6, "power2.out");
+        axes.set({ draw: gOn });
+        band.set({ draw: gOn, alpha: 0.35, pulse: K.pulse(t, T_HIT, { half: 0.1 }), hold: t >= T_HIT ? 0.6 : 0 });
+        capLine.set({ draw: gOn, pulse: K.pulse(t, T_HIT, { half: 0.1 }), hold: t >= T_HIT ? 1 : 0 });
+        curveLine.set({ draw: t < T_RUN ? 0 : uu, hold: 0.0 });
+        head.visible = t >= T_RUN;
+        head.position.set(hp.x, hp.y, 0.01);
+        head.set({ hold: 1, size: 14 + 22 * K.pulse(t, T_HIT, { half: 0.08 }) });
+        drop.visible = t >= T_RUN;
+        drop.position.set(hp.x, 0, 0);
+        drop.scale.y = Math.max(0.001, hp.y);
+        drop.set({ hold: t >= T_HIT ? 1 : 0.5 });
+        text.visible = t >= T_RUN - 0.25;
+        text.paint(t < T_RUN ? -1 : uu, { ahead: 0.4 * K.span(t, T_RUN - 0.25, 0.25), window: 0.22 });
+        return { c, hp, uu };
+      }
+
+      function hud(t, hp) {
+        timeEl.textContent = t.toFixed(3);
+        let born = 0;
+        T_NODE.forEach((tn) => t >= tn && born++);
+        countEl.textContent = born;
+        // throughput follows the head's height; at the hit it clamps to the limit, in the accent
+        const rate = t < T_RUN ? 0 : LIMIT * (hp.y / CAP);
+        rateEl.textContent = (t >= T_HIT ? fmt(LIMIT) : fmt(Math.min(LIMIT * 0.999, rate))) + " rps";
+        rateEl.classList.toggle("cap", t >= T_HIT);
+        // axis labels painted on the walls follow them
+        axEls.forEach((el, i) => {
+          const s = stage.project(wp.copy(AX_P[i]));
+          const vis = s.visible && s.x > -200 && s.x < 2100 && s.y > -100 && s.y < 1180;
+          el.style.opacity = vis ? 0.9 * K.span(t, 0.4 + i * 0.1, 0.3) * (1 - K.span(t, T_BACK, 0.25)) : 0;
+          el.style.transform = `translate(${s.x}px, ${s.y}px)`;
+        });
+        // leader tags on the nodes
+        tags.forEach((el, i) => {
+          const s = stage.project(wp.copy(NODE_P[i]));
+          const on = Math.min(1, Math.max(0, (t - T_NODE[i]) / 0.08)) * (1 - K.span(t, T_BACK - 0.1, 0.2));
+          const lx = s.x + 70, ly = s.y - 64;
+          leads[i].setAttribute("points", `${s.x},${s.y} ${s.x + 30},${ly} ${lx + 150},${ly}`);
+          el.style.transform = `translate(${lx}px, ${ly - 20}px)`;
+          el.style.opacity = on; leads[i].style.opacity = on;
+        });
+        // the band label rides the cap's left end
+        const b = stage.project(G.localToWorld(wp.set(0.12, CAP + 0.16, 0)));
+        bandEl.style.transform = `translate(${b.x}px, ${b.y - 9}px)`;
+        bandEl.style.opacity = K.span(t, T_BACK + 0.2, 0.3);
+      }
+
+      function draw(t) {
+        let r;
+        const k = whipK(t);
+        if (k !== undefined) stage.renderBlurred(t, (tt) => (r = pose(tt)), { shutter: 2.2 / 60, samples: 14, gain: 1 + 1.2 * Math.sin(Math.PI * k) });
+        else { r = pose(t); stage.render(); }
+        hud(t, r.hp);
+      }
+
+      const driver = { _t: 0 };
+      Object.defineProperty(driver, "t", { get() { return this._t; }, set(v) { this._t = v; draw(v); } });
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(driver, { t: 0 }, { t: DUR, duration: DUR, ease: "none", immediateRender: false }, 0);
+      window.__timelines = window.__timelines || {};
+      window.__timelines[COMP] = tl;
+
+      draw(0);
+      await stage.renderer.compileAsync(stage.scene, stage.camera);
+      window.__srReady();
+    </script>
+  </body>
+</html>

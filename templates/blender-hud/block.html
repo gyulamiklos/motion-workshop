@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>__TITLE__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a090c; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: "JetBrains Mono", monospace; color: #fff; }
+      #bh-world { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+      #bh-hud { position: absolute; inset: 0; pointer-events: none; }
+      .hud { position: absolute; font-size: 15px; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.62); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .hud b { color: #fff; font-weight: 700; }
+      .hud em { font-style: normal; color: var(--accent, #ff2d8c); }
+      #bh-status { left: 112px; top: 78px; }
+      #bh-head { position: absolute; left: 108px; top: 112px; font-family: "Archivo Black", sans-serif; font-size: 64px; line-height: 1.08; letter-spacing: -0.01em; }
+      #bh-head span { color: rgba(255, 255, 255, 0); }
+      .label { position: absolute; left: 0; top: 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); transform-origin: 50% 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="__ID__" data-start="0" data-duration="__DUR__" data-width="1920" data-height="1080">
+      <video id="bh-world" class="clip" src="assets/__VIDEO__" muted playsinline data-start="0" data-duration="__DUR__" data-track-index="0"></video>
+      <div id="bh-hud" data-layout-ignore class="clip" data-start="0" data-duration="__DUR__" data-track-index="1">
+        <div id="bh-status" class="hud"></div>
+        <div id="bh-head"></div>
+      </div>
+      <div id="bh-drv" class="clip" data-start="0" data-duration="__DUR__" data-track-index="2" style="position: absolute; width: 1px; height: 1px; opacity: 0"></div>
+    </div>
+
+    <script>
+      window.__hf = window.__hf || {};
+      window.__hf.buildReady = window.__hf.buildReady || {};
+      window.__hf.buildReady["__ID__"] = new Promise((res) => (window.__bhReady = res));
+    </script>
+    <script type="module">
+      // HUD on a Blender render (templates/blender-hud, built by scripts/blender-block.sh). assets/proj.json says, per
+      // frame, where each anchor is on screen and what the counters read; assets/hud.json says what to write and when.
+      // hud.json: { id, duration, accent?, status?: "text with {field}", head?: { lines: [[word...]...], times: [s...] },
+      //   labels?: [{ anchor, texts: [...], in: [s...], in_dur, out, out_dur, accent: [s0, s1], dx, dy }] }
+      const COMP = "__ID__";
+      const H = await (await fetch("assets/hud.json")).json();
+      const P = await (await fetch("assets/proj.json")).json();
+      const DUR = H.duration;
+      if (H.accent) document.documentElement.style.setProperty("--accent", H.accent);
+      const clamp01 = (x) => Math.min(1, Math.max(0, x));
+      const span = (t, t0, d) => clamp01((t - t0) / d);
+      const fmt = (n) => Math.round(n).toLocaleString("en-US").replace(/,/g, " ");
+
+      const statusEl = document.getElementById("bh-status");
+      const headEl = document.getElementById("bh-head");
+      if (!H.status) statusEl.remove();
+      const words = [];
+      if (H.head) {
+        headEl.innerHTML = H.head.lines.map((ws) => ws.map((w) => `<span>${w}</span>`).join(" ")).join("<br />");
+        words.push(...headEl.querySelectorAll("span"));
+      } else headEl.remove();
+      const hud = document.getElementById("bh-hud");
+      const labels = (H.labels || []).flatMap((L) => L.texts.map((text, i) => {
+        const el = Object.assign(document.createElement("div"), { className: "label", textContent: text });
+        hud.appendChild(el);
+        return { el, L, i };
+      }));
+
+      function draw(t) {
+        const f = P.frames[Math.min(P.frames.length - 1, Math.max(0, Math.round(t * P.fps)))];
+        if (H.status) statusEl.innerHTML = H.status.replace(/\{(\w+)\}/g, (_, k) => fmt(f[k]));
+        if (H.head) {
+          // the newest word in the accent, earlier ones white, the next one waiting in grey
+          const cur = H.head.times.reduce((k, tw, i) => (t >= tw ? i : k), -1);
+          words.forEach((w, i) => {
+            w.style.color = i < cur ? "#fff" : i === cur ? "var(--accent, #ff2d8c)" : i === cur + 1 ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0)";
+          });
+        }
+        for (const { el, L, i } of labels) {
+          const [x, y, front] = f[L.anchor][i];
+          const [a0, a1] = L.accent || [1e9, 1e9];
+          const t0 = Array.isArray(L.in) ? L.in[i] : L.in;
+          el.style.opacity = span(t, t0, L.in_dur ?? 0.1) * (1 - span(t, L.out ?? 1e9, L.out_dur ?? 0.3)) * (front ? 1 : 0);
+          el.style.color = t >= a0 && t < a1 ? "var(--accent, #ff2d8c)" : "rgba(255,255,255,0.75)";
+          el.style.transform = `translate(${x + (L.dx ?? -28)}px, ${y + (L.dy ?? 8)}px)`;
+        }
+      }
+
+      const driver = { _t: 0 };
+      Object.defineProperty(driver, "t", { get() { return this._t; }, set(v) { this._t = v; draw(v); } });
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(driver, { t: 0 }, { t: DUR, duration: DUR, ease: "none", immediateRender: false }, 0);
+      window.__timelines = window.__timelines || {};
+      window.__timelines[COMP] = tl;
+      draw(0);
+      window.__bhReady();
+    </script>
+  </body>
+</html>

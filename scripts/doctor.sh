@@ -26,6 +26,11 @@ elif [ "$(git -C "$VENDOR" rev-parse HEAD)" != "$pinned" ]; then bad "video-shot
 elif [ -n "$(git -C "$VENDOR" status --porcelain --untracked-files=no)" ]; then bad "vendor/video-shotcraft has local changes"
 else ok "video-shotcraft at ${pinned:0:7}"; fi
 
+BV=$(tr -d '[:space:]' < blender.version 2>/dev/null)
+case "$(scripts/blender.sh -b --factory-startup --version 2>/dev/null | head -1)" in
+  "Blender $BV"*) ok "blender $BV (scripts/blender.sh)" ;;
+  *) warn "blender $BV missing (3D scenes in recipes/line3d/blender): see scripts/blender.sh" ;;
+esac
 command -v yt-dlp >/dev/null 2>&1 && ok "yt-dlp $(yt-dlp --version)" || warn "yt-dlp missing (reference downloads): uv tool install yt-dlp --with yt-dlp-ejs"
 [ -x tools/tts/.venv/bin/python ] && [ "$(ls tools/tts/voices/*.onnx 2>/dev/null | wc -l)" -ge 1 ] && ok "voice (piper)" || warn "voice not set up: tools/tts/setup.sh"
 for c in tools/*-capture; do
