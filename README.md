@@ -18,14 +18,14 @@ nem megy külső szolgáltatóhoz. Alapértelmezett hang: `imre` (férfi); női 
 
 ## Beállítás (egyszer)
 
-Kell hozzá: Linux vagy macOS, Node.js 22+, `ffmpeg`, `git`, `gh` (bejelentkezve), Python 3.10+, [`uv`](https://docs.astral.sh/uv/).
+Kell hozzá: Linux vagy macOS, Node.js 22+, `ffmpeg`, `git`, `gh` (bejelentkezve), Python 3.10+, [`uv`](https://docs.astral.sh/uv/); referenciavideó letöltéséhez `yt-dlp` (`uv tool install yt-dlp --with yt-dlp-ejs`).
 
 ```bash
 # 1. A műhely klónja (a skillek ebből futtatják az eszközöket)
 git clone https://github.com/gyulamiklos/motion-workshop.git
 cd motion-workshop
 git config core.hooksPath .githooks
-# ha nem a /mnt/storage/04-projects/motion-graphics helyre klónoztad:
+# a skillek innen tudják, hol a műhely:
 echo 'export MOTION_WORKSHOP="'"$PWD"'"' >> ~/.bashrc
 
 # 2. HyperFrames: a rögzített verzió skilljei, telemetria ki

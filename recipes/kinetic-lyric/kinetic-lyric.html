@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Kinetic lyric</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #121014; }
+    </style>
+  </head>
+  <body>
+    <!-- A sung or spoken line: every word is on screen from the start, squeezed and grey; the current word
+         unsqueezes about its centre while an accent colour sweeps through it letter by letter, then turns
+         white when the next word starts. Accent words keep the accent colour. See card.md for the numbers. -->
+    <div
+      id="kl-root"
+      data-composition-id="kinetic-lyric"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="4"
+      data-composition-variables='[
+        {"id":"text","type":"string","label":"Line (\\n starts a new row)","default":"Every test is green and\nshipping on a Friday"},
+        {"id":"times","type":"string","label":"Word starts in s from line start (JSON array; empty = even beat)","default":""},
+        {"id":"beat","type":"number","label":"Seconds per word when times is empty","default":0.24},
+        {"id":"start","type":"number","label":"Line start (s)","default":0.1},
+        {"id":"accent","type":"string","label":"Words that keep the accent (comma separated)","default":"green,Friday"},
+        {"id":"squeeze","type":"number","label":"scaleX of a word not yet sung (1 = off)","default":0.58},
+        {"id":"bg","type":"color","label":"Background","default":"#121014"},
+        {"id":"future","type":"color","label":"Not yet sung","default":"#8f8a90"},
+        {"id":"active","type":"color","label":"Accent","default":"#ff2d8c"},
+        {"id":"past","type":"color","label":"Sung","default":"#f5f1ea"}
+      ]'
+    >
+      <div id="kl-clip" class="clip" data-start="0" data-duration="4" data-track-index="0">
+        <div id="kl-bg"></div>
+        <div id="kl-line" data-layout-allow-overflow></div>
+      </div>
+
+      <style>
+        #kl-root { position: absolute; inset: 0; font-family: 'Archivo Black', sans-serif; }
+        #kl-clip { position: absolute; inset: 0; overflow: hidden; }
+        #kl-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 30% 45%, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0) 70%), var(--kl-bg, #121014); }
+        #kl-line { position: absolute; left: 160px; top: 50%; transform: translateY(-50%); width: 1600px;
+          display: flex; flex-direction: column; row-gap: 0.12em; font-size: 84px; line-height: 1.1; letter-spacing: -0.01em; }
+        .kl-row { display: flex; column-gap: 0.26em; }
+        .kl-w { position: relative; isolation: isolate; display: inline-block; transform-origin: 50% 60%; white-space: pre; }
+        .kl-g { position: absolute; left: -35%; right: -35%; top: -70%; bottom: -70%; opacity: 0; pointer-events: none;
+          background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--kl-glow) 0%, rgba(0,0,0,0) 70%); }
+        .kl-c { position: relative; display: inline-block; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("kl-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function hexA(hex, a) {
+            var h = String(hex).replace("#", ""); if (h.length === 3) h = h.replace(/(.)/g, "$1$1");
+            var n = parseInt(h, 16); return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
+          }
+
+          var v = readVars();
+          var root = document.getElementById("kl-root");
+          root.style.setProperty("--kl-bg", v.bg);
+          root.style.setProperty("--kl-glow", hexA(v.active, 0.22));
+          var squeeze = Number(v.squeeze) || 1;
+          var accent = String(v.accent || "").split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+          var bare = function (w) { return w.toLowerCase().replace(/[^\p{L}\p{N}']/gu, ""); };
+
+          // build rows > words > letters
+          var line = document.getElementById("kl-line");
+          var words = [];
+          String(v.text || "").replace(/\\n/g, "\n").split("\n").forEach(function (rowText) {
+            var row = document.createElement("div"); row.className = "kl-row"; line.appendChild(row);
+            rowText.split(" ").filter(Boolean).forEach(function (w) {
+              var el = document.createElement("span"); el.className = "kl-w";
+              var g = document.createElement("span"); g.className = "kl-g"; el.appendChild(g);
+              var chars = Array.from(w).map(function (ch) {
+                var c = document.createElement("span"); c.className = "kl-c"; c.textContent = ch; el.appendChild(c); return c;
+              });
+              row.appendChild(el);
+              words.push({ el: el, glow: g, chars: chars, accent: accent.indexOf(bare(w)) >= 0 });
+            });
+          });
+
+          var t0 = Number(v.start) || 0;
+          var beat = Number(v.beat) || 0.24;
+          var times = [];
+          try { times = JSON.parse(v.times || "[]"); } catch (e) { times = []; }
+          if (!Array.isArray(times) || times.length < words.length) times = words.map(function (_, i) { return i * beat; });
+          var lineEnd = times[words.length - 1] + Math.max(beat, 0.5) * 2;
+
+          var tl = gsap.timeline({ paused: true });
+          // entrance: the whole line lands in two frames, grey and squeezed (a cut, not a reveal)
+          words.forEach(function (w) {
+            gsap.set(w.el, { scaleX: squeeze });
+            gsap.set(w.chars, { color: v.future });
+          });
+          tl.fromTo("#kl-line", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.07, ease: "none" }, t0 - 0.07);
+
+          words.forEach(function (w, i) {
+            var s = t0 + times[i];
+            var dur = (i + 1 < words.length ? times[i + 1] : lineEnd) - times[i];
+            // the word unsqueezes about its centre in ~0.15 s, decelerating
+            tl.to(w.el, { scaleX: 1, duration: Math.min(0.15, dur), ease: "power2.out" }, s);
+            // the accent sweeps through the letters over ~65% of the word's sung length
+            var sweep = Math.max(0.05, dur * 0.65);
+            w.chars.forEach(function (c, k) {
+              tl.to(c, { color: v.active, duration: 0.017, ease: "none" }, s + sweep * k / w.chars.length);
+            });
+            tl.to(w.el, { textShadow: "0 0 14px " + hexA(v.active, 0.35), duration: 0.06, ease: "none" }, s);
+            tl.to(w.glow, { opacity: 1, duration: 0.12, ease: "power1.out" }, s);
+            // it turns white about two frames after the next word starts (the eye is already on the next word);
+            // an accent word keeps its colour
+            var e = t0 + times[i] + dur + 0.035;
+            if (i + 1 < words.length) {
+              if (!w.accent) tl.to(w.chars, { color: v.past, duration: 0.017, ease: "none" }, e);
+              tl.to(w.el, { textShadow: "0 0 0px " + hexA(v.active, 0), duration: 0.06, ease: "none" }, e);
+              tl.to(w.glow, { opacity: 0, duration: 0.2, ease: "power1.in" }, e);
+            }
+          });
+          window.__timelines = window.__timelines || {};
+          window.__timelines["kinetic-lyric"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

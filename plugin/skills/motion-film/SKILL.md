@@ -5,7 +5,7 @@ description: Make a branded motion-graphics film (product teaser, feature film, 
 
 # Brand film in the workshop
 
-**Workshop:** `${MOTION_WORKSHOP:-/mnt/storage/04-projects/motion-graphics}` (`$WS`). Read its `CLAUDE.md` and `STATE.md` first; their rules win.
+**Workshop:** `$MOTION_WORKSHOP`, or the current repo when it has `tools/breakdown/` (`$WS`). Read its `CLAUDE.md` and `STATE.md` first; their rules win.
 
 ## Pipeline
 1. **Brief → SPEC.md.** Purpose, audience, length, must-show features, voice or not. One message per shot; titles hold ≥ 1 s; plan the timeline with rest frames.

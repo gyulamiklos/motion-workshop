@@ -13,7 +13,7 @@ A repó publikus. Ami személyes vagy megrendelői, az **csak helyben** van, a `
 | `projects/YYYY-MM-DD_<név>/` | Egy film = egy HyperFrames-projekt (`scripts/new-film.sh`). `frame.md` = a márka videós nyelve, a `/hyperframes` skill magától olvassa. Helyi. |
 | `brands/<márka>/` | Márkacsomag: `BRAND.md` (hang, szabályok, alap repók, felvevő), `FRAME.md`, CSS, betűk, logók, `blocks/` (`*-title.html`, `*-outro.html`). Helyi. |
 | `templates/dev-recap/` | A fejlesztői összefoglaló jelenetblokkjai. |
-| `tools/` | `tts` (helyi magyar hang, Piper), `dev-recap` (gyűjtés, szűrés, összerakás), `breakdown` (referenciavideó mérése); a termékfelvevők (`*-capture`) helyiek. |
+| `tools/` | `tts` (helyi magyar hang, Piper), `dev-recap` (gyűjtés, szűrés, összerakás), `breakdown` (referenciavideó mérése és összevetése); a termékfelvevők (`*-capture`) helyiek. |
 | `recipes/` | Visszafejtett mozgás-receptek (kártya + blokk). A referenciavideók a `research/` alatt, gitben soha. |
 | `plugin/` | A `motion-workshop` Claude Code plugin skilljei: `motion-film`, `dev-recap`, `motion-breakdown`. Marketplace: `.claude-plugin/marketplace.json`. |
 | `vendor/video-shotcraft/` | Receptkártya-könyvtár és hangok, rögzített commiton (`vendor/video-shotcraft.commit`); **nem módosítjuk**. A Remotion-demóit csak olvassuk és átültetjük. |
@@ -29,7 +29,9 @@ V=$(cat hyperframes.version)          # a filmmappában: DO_NOT_TRACK=1 npx -y h
 tools/tts/setup.sh                    # magyar hang egyszeri telepítése
 tools/dev-recap/collect.sh --since D [--until D] <repo>...   # mi változott (csak olvas)
 node tools/dev-recap/build.mjs <recap.json> <film>           # összefoglaló film felépítése
-tools/breakdown/breakdown.sh <videó> [kimenet]               # referenciavideó mérése
+tools/breakdown/breakdown.sh <videó> [kimenet] [--shots N|--range A-B [--crop W:H:X:Y]]   # referenciavideó mérése; lapok kérésre
+python3 -I tools/breakdown/track.py measure|compare ...    # egy képrész mérése, referencia vs. saját render képkockában
+scripts/render-block.sh <blokk.html> [out.mp4] [--fps N] [--duration S] [--variables JSON]   # egy blokk renderje
 scripts/update-shotcraft.sh [--apply|--sync]                 # a receptkönyvtár frissítése
 git config core.hooksPath .githooks   # klónonként egyszer
 ```

@@ -7,7 +7,7 @@ description: Make a short video that sums up what a dev team shipped in a period
 
 One video per request: what reached the main branch in the period, one scene per change, every claim traceable to a PR or commit. Rules adapted from the MIT-licensed `/brag` skill (brag-video, Shunit Haviv Hakimi): hook first, cover everything, claims from the project, private stays private, readable timing.
 
-**Workshop:** `${MOTION_WORKSHOP:-/mnt/storage/04-projects/motion-graphics}` (call it `$WS`). All commands below run from there. Its `CLAUDE.md` rules apply (no publishing, `DO_NOT_TRACK=1` on every HyperFrames command, renders in `renders/`).
+**Workshop:** `$MOTION_WORKSHOP`, or the current repo when it has `tools/breakdown/` (call it `$WS`). All commands below run from there. Its `CLAUDE.md` rules apply (no publishing, `DO_NOT_TRACK=1` on every HyperFrames command, renders in `renders/`).
 
 ## Defaults (take overrides from the prompt)
 | What | Default |
