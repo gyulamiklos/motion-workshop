@@ -10,11 +10,13 @@ Motion graphics videók Claude Code-dal, [HyperFrames](https://github.com/heygen
 |---|---|---|
 | `dev-recap` | Rövid videó arról, mi került be a fő ágba egy időszakban (hét, sprint), PR-onként egy jelenet, magyar hangalámondással | „Csinálj recapet a múlt hétről az app és a web repóból.” |
 | `motion-film` | Márkás film valódi termékképernyőkből: teaser, funkcióvideó, weboldalra szánt animáció | „Készíts 20 mp-es teasert az új regisztrációs űrlapról.” |
+| `motion-explainer` | Magyarázó videó egy fogalomról (programnyelv, algoritmus, rendszer) három stílus egyikében: kódszerkesztő, krétatábla, tervrajz | „Készíts egyperces táblás magyarázó videót a Haskell curry-zéséről.” |
 | `motion-breakdown` | Egy referenciavideó mozgásának visszafejtése: mérés, receptkártya, újrahasznosítható blokk | „Nézd meg ezt a videót, és tanuld meg a nyitó mozgását.” (a fájl elérési útjával) |
 
 A filmek egy márkacsomagból dolgoznak (`brands/<márka>/`: `BRAND.md`, `FRAME.md`, betűk, logók,
 `blocks/<márka>-title.html` és `-outro.html`); ezek helyiek, a repóban nincsenek. A hang helyben készül (Piper), szöveg
 nem megy külső szolgáltatóhoz. Alapértelmezett hang: `imre` (férfi); női hang: `anna`, `berta`.
+A magyarázó videók márka nélkül, a `styles/` alatti stíluscsomagokból dolgoznak (ezek a repóban vannak).
 
 ## Beállítás (egyszer)
 
@@ -44,14 +46,14 @@ claude plugin install motion-workshop@motion-workshop
 scripts/doctor.sh
 ```
 
-Új Claude Code munkamenetben a három skill már elérhető. A plugin frissítése:
+Új Claude Code munkamenetben a négy skill már elérhető. A plugin frissítése:
 `claude plugin marketplace update motion-workshop`, a műhelyé: `git pull`.
 
 ## Használat
 
 - Kérd szavakkal (lásd a táblázatot). Claude elkészíti a filmet a `projects/` alá, megnézi képkockákon,
   és a kész MP4-et a `renders/` mappába teszi (ez nincs gitben).
-- Kézzel: `scripts/new-film.sh <név>` új film, `scripts/render-film.sh <filmmappa>` render
+- Kézzel: `scripts/new-film.sh <név> [márka|stílus]` új film, `scripts/render-film.sh <filmmappa>` render
   (zenés és zene nélküli változat, hangerőméréssel), `scripts/check.sh` ellenőrzés.
 - Szerkeszteni a HyperFrames böngészős felületén is lehet: a filmmappában `npm run dev`.
 

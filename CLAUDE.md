@@ -10,12 +10,13 @@ A repó publikus. Ami személyes vagy megrendelői, az **csak helyben** van, a `
 ## Felépítés
 | Hol | Mi |
 |---|---|
-| `projects/YYYY-MM-DD_<név>/` | Egy film = egy HyperFrames-projekt (`scripts/new-film.sh`). `frame.md` = a márka videós nyelve, a `/hyperframes` skill magától olvassa. Helyi. |
+| `projects/YYYY-MM-DD_<név>/` | Egy film = egy HyperFrames-projekt (`scripts/new-film.sh`). `frame.md` = a márka vagy a stílus videós nyelve, a `/hyperframes` skill magától olvassa. Helyi. |
 | `brands/<márka>/` | Márkacsomag: `BRAND.md` (hang, szabályok, alap repók, felvevő), `FRAME.md`, CSS, betűk, logók, `blocks/` (`*-title.html`, `*-outro.html`). Helyi. |
+| `styles/<stílus>/` | Explainer-stíluscsomagok (`code`, `chalk`, `blueprint`): `FRAME.md`, `blocks/`, betűk. A márkacsomag formája, de publikus, gitben van. |
 | `templates/dev-recap/` | A fejlesztői összefoglaló jelenetblokkjai. |
 | `tools/` | `tts` (helyi magyar hang, Piper), `dev-recap` (gyűjtés, szűrés, összerakás), `breakdown` (referenciavideó mérése és összevetése); a termékfelvevők (`*-capture`) helyiek. |
 | `recipes/` | Visszafejtett mozgás-receptek (kártya + blokk). A referenciavideók helyiek, gitben soha. |
-| `plugin/` | A `motion-workshop` Claude Code plugin skilljei: `motion-film`, `dev-recap`, `motion-breakdown`. Marketplace: `.claude-plugin/marketplace.json`. |
+| `plugin/` | A `motion-workshop` Claude Code plugin skilljei: `motion-film`, `motion-explainer`, `dev-recap`, `motion-breakdown`. Marketplace: `.claude-plugin/marketplace.json`. |
 | `vendor/video-shotcraft/` | Receptkártya-könyvtár és hangok, rögzített commiton (`vendor/video-shotcraft.commit`); **nem módosítjuk**. A Remotion-demóit csak olvassuk és átültetjük. |
 | `renders/` | Kész MP4-ek, git nélkül. |
 
@@ -23,7 +24,7 @@ A repó publikus. Ami személyes vagy megrendelői, az **csak helyben** van, a `
 ```bash
 scripts/check.sh                      # doctor + hyperframes check a változott filmeken; "OK" = zöld (pre-commit is futtatja)
 scripts/doctor.sh                     # node 22+, ffmpeg, rögzített HyperFrames CLI és skillek, shotcraft, hang, felvevő
-scripts/new-film.sh <slug> [márka]    # új film a márkacsomaggal (egy márkánál az az alap)
+scripts/new-film.sh <slug> [márka|stílus]   # új film márka- vagy stíluscsomaggal (egy márkánál az az alap)
 scripts/render-film.sh <film>         # check + render (+ zene nélküli változat) → renders/, hangerővel
 V=$(cat hyperframes.version)          # a filmmappában: DO_NOT_TRACK=1 npx -y hyperframes@$V check | snapshot | render -q delivery
 tools/tts/setup.sh                    # magyar hang egyszeri telepítése
@@ -59,4 +60,4 @@ git config core.hooksPath .githooks   # klónonként egyszer
 
 ## Munkamód
 Tömörítéskor tartsd meg: módosított fájlok, a check parancs, nyitott döntés, az aktuális film mappája.
-Agentic-code skillek: `working-mode` mindig, `quality-gate` és `match-the-codebase` kódváltozás előtt, `git-workflow` commit előtt. Filmhez a `motion-film`, összefoglalóhoz a `dev-recap`, referenciához a `motion-breakdown` skill (a pluginból, vagy közvetlenül a `plugin/skills/` alól). Kezdés `/agentic-code:resume-work`, zárás `/agentic-code:save-work`.
+Agentic-code skillek: `working-mode` mindig, `quality-gate` és `match-the-codebase` kódváltozás előtt, `git-workflow` commit előtt. Filmhez a `motion-film`, magyarázó videóhoz a `motion-explainer`, összefoglalóhoz a `dev-recap`, referenciához a `motion-breakdown` skill (a pluginból, vagy közvetlenül a `plugin/skills/` alól). Kezdés `/agentic-code:resume-work`, zárás `/agentic-code:save-work`.
