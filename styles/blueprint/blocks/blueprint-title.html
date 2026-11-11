@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Blueprint title</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0b2a4a; }
+    </style>
+  </head>
+  <body>
+    <!-- Chapter or film title as a drawing sheet: crop marks and the kicker are on the sheet at 0 s, the
+         title is plotted left to right, a dimension line with end ticks draws under it with its label,
+         and the title block (cartouche) at the bottom right fills in. The grid drifts the whole time. -->
+    <div
+      id="bt-root"
+      data-composition-id="blueprint-title"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="5"
+      data-composition-variables='[
+        {"id":"kicker","type":"string","label":"Kicker","default":"SHEET 03 / 05"},
+        {"id":"title","type":"string","label":"Title","default":"Function composition"},
+        {"id":"dimension","type":"string","label":"Label on the dimension line","default":"f . g = \\x -> f (g x)"},
+        {"id":"project","type":"string","label":"Cartouche: project","default":"HASKELL BASICS"},
+        {"id":"note","type":"string","label":"Cartouche: second row","default":"SCALE 1:1 · REV A"}
+      ]'
+    >
+      <div id="bt-clip" class="clip" data-start="0" data-duration="5" data-track-index="0">
+        <div id="bt-grid"></div>
+        <svg id="bt-svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+          <path id="bt-crop" fill="none" stroke="#e8f1ff" stroke-width="2" opacity="0.7"
+            d="M192,148 v-40 h40 M1728,148 v-40 h-40 M192,932 v40 h40 M1728,932 v40 h-40" />
+          <path id="bt-dim" fill="none" stroke="#ffb547" stroke-width="2" />
+          <path id="bt-ticks" fill="none" stroke="#ffb547" stroke-width="2" />
+          <path id="bt-cart" fill="none" stroke="#e8f1ff" stroke-width="2" d="M1108,812 h620 v120 h-620 Z M1108,872 h620 M1448,812 v60" />
+        </svg>
+        <div id="bt-kicker"></div>
+        <div id="bt-title"></div>
+        <div id="bt-dimlabel"></div>
+        <div id="bt-c1" class="bt-cell"></div>
+        <div id="bt-c2" class="bt-cell"></div>
+        <div id="bt-c3" class="bt-cell"></div>
+      </div>
+
+      <style>
+        #bt-root { position: absolute; inset: 0; font-family: 'IBM Plex Mono', monospace; color: #e8f1ff; }
+        #bt-clip { position: absolute; inset: 0; overflow: hidden; }
+        #bt-grid { position: absolute; left: -240px; top: -240px; width: 2400px; height: 1560px;
+          background-color: #0b2a4a;
+          background-image:
+            linear-gradient(rgba(232,241,255,0.13) 1px, rgba(0,0,0,0) 1px), linear-gradient(90deg, rgba(232,241,255,0.13) 1px, rgba(0,0,0,0) 1px),
+            linear-gradient(rgba(232,241,255,0.05) 1px, rgba(0,0,0,0) 1px), linear-gradient(90deg, rgba(232,241,255,0.05) 1px, rgba(0,0,0,0) 1px);
+          background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; }
+        #bt-svg { position: absolute; left: 0; top: 0; overflow: visible; }
+        #bt-kicker { position: absolute; left: 240px; top: 300px; font-size: 32px; font-weight: 500; letter-spacing: 0.16em; color: #8fb3d9; }
+        #bt-title { position: absolute; left: 236px; top: 352px; font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 150px; line-height: 1.05; letter-spacing: 0.01em; text-transform: uppercase; color: #e8f1ff; white-space: nowrap; }
+        #bt-dimlabel { position: absolute; top: 560px; font-size: 36px; color: #ffb547; padding: 0 18px; background: #0b2a4a; white-space: nowrap; }
+        .bt-cell { position: absolute; font-size: 28px; max-width: 300px; overflow: hidden; letter-spacing: 0.08em; color: #e8f1ff; white-space: nowrap; }
+        #bt-c1 { left: 1128px; top: 826px; }
+        #bt-c2 { left: 1468px; top: 826px; color: #8fb3d9; }
+        #bt-c3 { left: 1128px; top: 886px; color: #8fb3d9; max-width: 580px; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("bt-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function plot(p) { var len = p.getTotalLength() || 1; gsap.set(p, { strokeDasharray: len, strokeDashoffset: len, opacity: 0 }); return len; }
+
+          var v = readVars();
+          document.getElementById("bt-kicker").textContent = v.kicker || "";
+          document.getElementById("bt-title").textContent = v.title || "";
+          document.getElementById("bt-dimlabel").textContent = v.dimension || "";
+          document.getElementById("bt-c1").textContent = v.project || "";
+          document.getElementById("bt-c2").textContent = v.kicker || "";
+          document.getElementById("bt-c3").textContent = v.note || "";
+
+          // the dimension line spans the title's width (capped to the safe box), its label sits in a gap at the centre
+          var title = document.getElementById("bt-title");
+          // a long title steps down until it fits the safe width
+          for (var fs = 150; title.offsetWidth > 1488 && fs > 72; fs -= 6) title.style.fontSize = fs + "px";
+          var x1 = 240, x2 = Math.min(1728, 240 + title.offsetWidth), y = 582;
+          document.getElementById("bt-dim").setAttribute("d", "M" + x1 + "," + y + " H" + x2);
+          document.getElementById("bt-ticks").setAttribute("d",
+            "M" + x1 + "," + (y - 22) + " v44 M" + x2 + "," + (y - 22) + " v44 M" + (x1 + 4) + "," + y + " l18,-8 M" + (x1 + 4) + "," + y + " l18,8 M" + (x2 - 4) + "," + y + " l-18,-8 M" + (x2 - 4) + "," + y + " l-18,8");
+          var lab = document.getElementById("bt-dimlabel");
+          lab.style.left = ((x1 + x2) / 2 - lab.offsetWidth / 2) + "px";
+
+          var dim = plot(document.getElementById("bt-dim"));
+          plot(document.getElementById("bt-ticks"));
+          var cart = plot(document.getElementById("bt-cart"));
+
+          var tl = gsap.timeline({ paused: true });
+          tl.fromTo("#bt-grid", { x: 0, y: 0 }, { x: -48, y: -24, duration: 5, ease: "none" }, 0);
+          // the title is plotted: a linear wipe at constant speed
+          tl.fromTo("#bt-title", { clipPath: "inset(-10% 100% -10% 0%)" }, { clipPath: "inset(-10% -2% -10% 0%)", duration: 0.9, ease: "none" }, 0.2);
+          tl.set("#bt-ticks", { opacity: 1 }, 1.1);
+          tl.to("#bt-ticks", { strokeDashoffset: 0, duration: 0.25, ease: "none" }, 1.1);
+          tl.set("#bt-dim", { opacity: 1 }, 1.2);
+          tl.to("#bt-dim", { strokeDashoffset: 0, duration: dim / 2200, ease: "none" }, 1.2);
+          tl.fromTo(lab, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power1.out" }, 1.2 + dim / 4400);
+          tl.set("#bt-cart", { opacity: 1 }, 1.7);
+          tl.to("#bt-cart", { strokeDashoffset: 0, duration: cart / 2200, ease: "none" }, 1.7);
+          tl.fromTo(".bt-cell", { opacity: 0 }, { opacity: 1, duration: 0.2, stagger: 0.1, ease: "power1.out" }, 1.7 + cart / 2200);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["blueprint-title"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

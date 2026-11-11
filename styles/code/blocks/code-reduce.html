@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Code reduce</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0d1117; }
+    </style>
+  </head>
+  <body>
+    <!-- An expression rewritten step by step until it is a value (evaluation, substitution, a refactor).
+         Each step: the part that changes lights up in the accent on the current line, the rule that fires
+         appears on the right, and the next line types in under it with its new part in the accent, which
+         cools to plain syntax colour. Earlier lines dim. What changed between two lines is found by their
+         common prefix and suffix, so steps are plain strings. -->
+    <div
+      id="cr-root"
+      data-composition-id="code-reduce"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="12"
+      data-composition-variables='[
+        {"id":"kicker","type":"string","label":"Kicker (a comment line)","default":"-- how sum runs"},
+        {"id":"steps","type":"string","label":"Steps (JSON array of lines, first is the input)","default":"[\"sum [1, 2, 3]\",\"1 + sum [2, 3]\",\"1 + (2 + sum [3])\",\"1 + (2 + (3 + sum []))\",\"1 + (2 + (3 + 0))\",\"6\"]"},
+        {"id":"rules","type":"string","label":"Rule per step (JSON array, step i to i+1)","default":"[\"sum (x:xs) = x + sum xs\",\"sum (x:xs) = x + sum xs\",\"sum (x:xs) = x + sum xs\",\"sum [] = 0\",\"arithmetic\"]"},
+        {"id":"focus","type":"string","label":"Redex per step (JSON array of substrings of step i; empty = what the diff changes)","default":"[\"sum [1, 2, 3]\",\"sum [2, 3]\",\"sum [3]\",\"sum []\",\"1 + (2 + (3 + 0))\"]"},
+        {"id":"beat","type":"number","label":"Seconds per step","default":1.5},
+        {"id":"start","type":"number","label":"First step (s)","default":0.9}
+      ]'
+    >
+      <div id="cr-clip" class="clip" data-start="0" data-duration="12" data-track-index="0">
+        <div id="cr-bg"></div>
+        <div id="cr-kicker"></div>
+        <div id="cr-window" data-layout-allow-overflow><div id="cr-lines"></div></div>
+        <div id="cr-rule"><span id="cr-rule-tag">rule</span><div id="cr-rule-box"></div></div>
+      </div>
+
+      <style>
+        #cr-root { position: absolute; inset: 0; font-family: 'JetBrains Mono', monospace; }
+        #cr-clip { position: absolute; inset: 0; overflow: hidden; }
+        #cr-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 30% 40%, rgba(139,148,158,0.06) 0%, rgba(139,148,158,0) 70%), #0d1117; }
+        #cr-kicker { position: absolute; left: 200px; top: 150px; font-size: 32px; color: #6e7681; letter-spacing: 0.01em; }
+        #cr-window { position: absolute; left: 200px; top: 240px; width: 1100px; height: 640px; overflow: hidden; }
+        #cr-lines { position: absolute; left: 0; top: 0; width: 100%; }
+        .cr-line { height: 104px; display: flex; align-items: center; font-size: 60px; white-space: pre; color: #e6edf3; }
+        .cr-gut { width: 64px; flex: none; font-size: 30px; color: #6e7681; }
+        .cr-c { display: inline-block; position: relative; }
+        .cr-hl { position: absolute; left: -4px; right: -4px; top: 6px; bottom: 6px; border-radius: 8px; background: rgba(255,203,107,0.16); box-shadow: inset 0 -3px 0 #ffcb6b; transform-origin: 0 50%; }
+        .k-kw { color: #c792ea; } .k-ty { color: #7fdbca; } .k-num { color: #f78c6c; } .k-str { color: #c3e88d; } .k-op { color: #89ddff; } .k-com { color: #6e7681; }
+        #cr-rule { position: absolute; left: 1340px; top: 300px; width: 440px; display: flex; flex-direction: column; gap: 14px; }
+        #cr-rule-tag { font-size: 28px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffcb6b; }
+        #cr-rule-box { position: relative; }
+        .cr-rule-text { position: absolute; left: 0; top: 0; width: 440px; font-size: 30px; line-height: 1.35; color: #e6edf3; white-space: pre-wrap; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("cr-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function list(v) {
+            if (Array.isArray(v)) return v;
+            try { var a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+          }
+          // syntax class per character: comments, strings, numbers, keywords, Capitalised types, operators
+          var KW = /^(let|in|where|case|of|if|then|else|data|type|newtype|class|instance|do|module|import|deriving|forall|return|fun|def|const|function)$/;
+          function classes(s) {
+            var out = new Array(s.length).fill(""), i = 0, m;
+            while (i < s.length) {
+              var rest = s.slice(i);
+              if ((m = rest.match(/^--.*/))) { fill(i, m[0].length, "k-com"); i += m[0].length; continue; }
+              if ((m = rest.match(/^"(?:[^"\\]|\\.)*"?/))) { fill(i, m[0].length, "k-str"); i += m[0].length; continue; }
+              if ((m = rest.match(/^\d+(\.\d+)?/))) { fill(i, m[0].length, "k-num"); i += m[0].length; continue; }
+              if ((m = rest.match(/^[A-Za-z_][A-Za-z0-9_']*/))) {
+                fill(i, m[0].length, KW.test(m[0]) ? "k-kw" : /^[A-Z]/.test(m[0]) ? "k-ty" : "");
+                i += m[0].length; continue;
+              }
+              if ((m = rest.match(/^[=+\-*\/<>:.|\\$&!@^~%?]+/))) { fill(i, m[0].length, "k-op"); i += m[0].length; continue; }
+              i++;
+            }
+            return out;
+            function fill(a, n, c) { for (var j = a; j < a + n; j++) out[j] = c; }
+          }
+          // the changed middle of b against a: [start, endA, endB) after the common prefix and suffix
+          function diff(a, b) {
+            var p = 0;
+            while (p < a.length && p < b.length && a[p] === b[p]) p++;
+            var s = 0;
+            while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+            return { start: p, endA: a.length - s, endB: b.length - s };
+          }
+
+          var v = readVars();
+          var steps = list(v.steps).map(String);
+          var rules = list(v.rules).map(String);
+          var focus = list(v.focus).map(String);
+          var beat = Number(v.beat) || 1.5;
+          var t0 = Number(v.start) || 0;
+          document.getElementById("cr-kicker").textContent = v.kicker || "";
+
+          var box = document.getElementById("cr-lines");
+          var lines = steps.map(function (s, n) {
+            var row = document.createElement("div"); row.className = "cr-line";
+            var g = document.createElement("span"); g.className = "cr-gut"; g.textContent = n === 0 ? ">" : "="; row.appendChild(g);
+            var cls = classes(s);
+            var chars = s.split("").map(function (ch, i) {
+              var c = document.createElement("span"); c.className = "cr-c" + (cls[i] ? " " + cls[i] : ""); c.textContent = ch;
+              row.appendChild(c); return c;
+            });
+            box.appendChild(row);
+            return { row: row, gut: g, chars: chars };
+          });
+
+          // a highlight band behind chars [a, b) of a line
+          function band(line, a, b) {
+            if (b <= a) return null;
+            var first = line.chars[a], last = line.chars[b - 1];
+            var hl = document.createElement("span"); hl.className = "cr-hl";
+            hl.style.left = (first.offsetLeft - 4) + "px";
+            hl.style.width = (last.offsetLeft + last.offsetWidth - first.offsetLeft + 8) + "px";
+            hl.style.top = "18px"; hl.style.bottom = "18px"; hl.style.right = "auto";
+            line.row.style.position = "relative"; line.row.insertBefore(hl, line.row.firstChild);
+            return hl;
+          }
+
+          var ACC = "#ffcb6b";
+          var tl = gsap.timeline({ paused: true });
+          tl.fromTo("#cr-kicker", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.4, ease: "power3.out" }, 0.1);
+          // the input types in
+          tl.fromTo(lines[0].gut, { opacity: 0 }, { opacity: 1, duration: 0.15 }, 0.25);
+          lines[0].chars.forEach(function (c, i) { tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.01 }, 0.3 + i * 0.028); });
+          lines.slice(1).forEach(function (l) { gsap.set([l.gut].concat(l.chars), { opacity: 0 }); });
+          gsap.set("#cr-rule", { opacity: 0 });
+
+          var LINE_H = 104, VISIBLE = 6, prevRule = null, ruleShown = false;
+          for (var n = 0; n < lines.length - 1; n++) {
+            var a = lines[n], b = lines[n + 1], d = diff(steps[n], steps[n + 1]);
+            var t = t0 + 0.3 + steps[0].length * 0.028 + n * beat;
+            // 1. the redex lights up on the current line
+            var f = focus[n] ? steps[n].indexOf(focus[n]) : -1;
+            var hl = f >= 0 ? band(a, f, f + focus[n].length) : band(a, d.start, d.endA);
+            if (hl) tl.fromTo(hl, { scaleX: 0, opacity: 1 }, { scaleX: 1, duration: 0.22, ease: "power3.out" }, t);
+            // 2. the rule that fires
+            // the same rule firing again stays on screen (it is read once, then it keeps working)
+            var same = prevRule && rules[n] === rules[n - 1];
+            if (prevRule && !same) { tl.to(prevRule, { opacity: 0, duration: 0.12, ease: "power1.in" }, t - 0.12); prevRule = null; }
+            if (same) { tl.fromTo(prevRule, { color: "#ffcb6b" }, { color: "#e6edf3", duration: 0.5, ease: "power1.out", immediateRender: false }, t); }
+            else if (rules[n]) {
+              var r = document.createElement("div"); r.className = "cr-rule-text"; r.textContent = rules[n];
+              document.getElementById("cr-rule-box").appendChild(r); gsap.set(r, { opacity: 0 });
+              if (!ruleShown) { tl.to("#cr-rule", { opacity: 1, duration: 0.2 }, t); ruleShown = true; }
+              tl.fromTo(r, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out", immediateRender: false }, t + 0.05);
+              prevRule = r;
+            }
+            // 3. the next line: kept parts appear, the new part types in the accent and cools
+            var tn = t + 0.45;
+            tl.fromTo(b.gut, { opacity: 0 }, { opacity: 1, duration: 0.15 }, tn);
+            b.chars.forEach(function (c, i) {
+              var isNew = i >= d.start && i < d.endB;
+              if (!isNew) { tl.fromTo(c, { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "power1.out" }, tn); return; }
+              var k = i - d.start;
+              var base = getComputedStyle(c).color;
+              tl.fromTo(c, { opacity: 0, color: ACC }, { opacity: 1, duration: 0.01 }, tn + 0.05 + k * 0.03);
+              tl.to(c, { color: base, duration: 0.35, ease: "power1.out" }, tn + 0.05 + (d.endB - d.start) * 0.03 + 0.35);
+            });
+            // 4. the old line steps back
+            tl.to(a.row, { opacity: 0.32, duration: 0.3, ease: "power1.out" }, tn + 0.2);
+            if (hl) tl.to(hl, { opacity: 0, duration: 0.3, ease: "power1.out" }, tn + 0.2);
+            // 5. scroll when the window is full
+            if (n + 2 > VISIBLE) tl.to(box, { y: -(n + 2 - VISIBLE) * LINE_H, duration: 0.4, ease: "power3.inOut" }, tn - 0.1);
+          }
+          // the last line is the answer: it keeps full strength, its gutter mark turns to the accent
+          var lastT = t0 + 0.3 + steps[0].length * 0.028 + (lines.length - 1) * beat;
+          if (lines.length > 1) {
+            tl.to("#cr-rule", { opacity: 0, duration: 0.3, ease: "power1.in" }, lastT);
+            tl.to(lines[lines.length - 1].gut, { color: ACC, duration: 0.3 }, lastT);
+          }
+          window.__timelines = window.__timelines || {};
+          window.__timelines["code-reduce"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>

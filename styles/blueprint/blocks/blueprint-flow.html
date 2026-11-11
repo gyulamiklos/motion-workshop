@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Blueprint flow</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0b2a4a; }
+    </style>
+  </head>
+  <body>
+    <!-- A pipeline drawn like a technical drawing: boxes are plotted one by one (their outline draws, the
+         label types), arrows join them, then a signal (the accent dot) travels the whole chain; at each box
+         its value appears above it in the accent and the box outline flashes. For data flows, function
+         composition, request paths, build steps. -->
+    <div
+      id="bf-root"
+      data-composition-id="blueprint-flow"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="10"
+      data-composition-variables='[
+        {"id":"kicker","type":"string","label":"Kicker","default":"FIG. 3 · PIPELINE"},
+        {"id":"nodes","type":"string","label":"Nodes (JSON array of {label, sub})","default":"[{\"label\":\"[1..6]\",\"sub\":\"input\"},{\"label\":\"filter even\",\"sub\":\"keep\"},{\"label\":\"map (*2)\",\"sub\":\"transform\"},{\"label\":\"sum\",\"sub\":\"fold\"}]"},
+        {"id":"values","type":"string","label":"Value at each node when the signal arrives (JSON array; empty = none)","default":"[\"[1,2,3,4,5,6]\",\"[2,4,6]\",\"[4,8,12]\",\"24\"]"},
+        {"id":"caption","type":"string","label":"Caption under the drawing","default":"sum . map (*2) . filter even"}
+      ]'
+    >
+      <div id="bf-clip" class="clip" data-start="0" data-duration="10" data-track-index="0">
+        <div id="bf-grid"></div>
+        <div id="bf-kicker"></div>
+        <svg id="bf-svg" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
+        <div id="bf-labels"></div>
+        <div id="bf-caption"></div>
+      </div>
+
+      <style>
+        #bf-root { position: absolute; inset: 0; font-family: 'IBM Plex Mono', monospace; color: #e8f1ff; }
+        #bf-clip { position: absolute; inset: 0; overflow: hidden; }
+        #bf-grid { position: absolute; left: -240px; top: -240px; width: 2400px; height: 1560px;
+          background-color: #0b2a4a;
+          background-image:
+            linear-gradient(rgba(232,241,255,0.13) 1px, rgba(0,0,0,0) 1px), linear-gradient(90deg, rgba(232,241,255,0.13) 1px, rgba(0,0,0,0) 1px),
+            linear-gradient(rgba(232,241,255,0.05) 1px, rgba(0,0,0,0) 1px), linear-gradient(90deg, rgba(232,241,255,0.05) 1px, rgba(0,0,0,0) 1px);
+          background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; }
+        #bf-kicker { position: absolute; left: 200px; top: 150px; font-size: 30px; font-weight: 500; letter-spacing: 0.16em; color: #8fb3d9; }
+        #bf-svg { position: absolute; left: 0; top: 0; overflow: visible; }
+        #bf-labels { position: absolute; inset: 0; }
+        .bf-label { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 500; color: #e8f1ff; white-space: nowrap; }
+        .bf-sub { position: absolute; text-align: center; font-size: 28px; letter-spacing: 0.16em; text-transform: uppercase; color: #8fb3d9; }
+        .bf-val { position: absolute; text-align: center; font-size: 34px; font-weight: 600; color: #ffb547; white-space: nowrap; }
+        #bf-caption { position: absolute; left: 0; right: 0; top: 820px; text-align: center; font-size: 40px; color: #e8f1ff; letter-spacing: 0.02em; }
+      </style>
+
+      <script>
+        (function () {
+          "use strict";
+          function readVars() {
+            var out = {};
+            try { JSON.parse(document.getElementById("bf-root").getAttribute("data-composition-variables")).forEach(function (d) { out[d.id] = d.default; }); } catch (e) {}
+            var hf = window.__hyperframes;
+            var over = hf && typeof hf.getVariables === "function" ? hf.getVariables() : window.__hfVariables;
+            if (over && typeof over === "object") for (var k in over) if (over[k] !== undefined) out[k] = over[k];
+            return out;
+          }
+          function list(v) {
+            if (Array.isArray(v)) return v;
+            try { var a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+          }
+          var NS = "http://www.w3.org/2000/svg";
+          function el(tag, attrs, parent) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+          function div(cls, text, css) { var d = document.createElement("div"); d.className = cls; d.textContent = text; for (var k in css) d.style[k] = css[k]; document.getElementById("bf-labels").appendChild(d); return d; }
+          // a path prepared for a plotter draw: its length becomes the dash
+          function plot(p) { var len = p.getTotalLength() || 1; gsap.set(p, { strokeDasharray: len, strokeDashoffset: len, opacity: 0 }); return len; }
+
+          var v = readVars();
+          var nodes = list(v.nodes), values = list(v.values).map(String);
+          document.getElementById("bf-kicker").textContent = v.kicker || "";
+          document.getElementById("bf-caption").textContent = v.caption || "";
+          var svg = document.getElementById("bf-svg");
+          var INK = "#e8f1ff", ACC = "#ffb547";
+
+          // layout: equal boxes across the title-safe width, centred on y = 520
+          var n = Math.max(1, nodes.length), GAP = 130, X0 = 200, W = (1520 - (n - 1) * GAP) / n, H = 190, Y = 520 - H / 2;
+          var parts = nodes.map(function (nd, i) {
+            var x = X0 + i * (W + GAP);
+            var box = el("path", { d: "M" + x + "," + Y + " h" + W + " v" + H + " h" + -W + " Z", fill: "none", stroke: INK, "stroke-width": 2 }, svg);
+            // corner ticks outside the box, like registration marks
+            var ticks = el("path", { d: "M" + (x - 14) + "," + Y + " h8 M" + (x + W + 6) + "," + (Y + H) + " h8 M" + x + "," + (Y - 14) + " v8 M" + (x + W) + "," + (Y + H + 6) + " v8", fill: "none", stroke: INK, "stroke-width": 2, opacity: 0.6 }, svg);
+            var label = String(nd.label || "");
+            var size = Math.min(44, Math.floor((W - 36) / Math.max(1, label.length) / 0.6));
+            var lab = div("bf-label", label, { left: x + "px", top: Y + "px", width: W + "px", height: H + "px", fontSize: size + "px" });
+            var sub = div("bf-sub", String(nd.sub || ""), { left: x + "px", top: (Y + H + 22) + "px", width: W + "px" });
+            var val = values[i] ? div("bf-val", values[i], { left: (x - GAP / 2) + "px", top: (Y - 64) + "px", width: (W + GAP) + "px" }) : null;
+            return { x: x, box: box, ticks: ticks, lab: lab, sub: sub, val: val };
+          });
+          var arrows = parts.slice(1).map(function (p, i) {
+            var x1 = parts[i].x + W + 10, x2 = p.x - 12, y = Y + H / 2;
+            var shaft = el("path", { d: "M" + x1 + "," + y + " H" + x2, fill: "none", stroke: INK, "stroke-width": 2 }, svg);
+            var head = el("path", { d: "M" + (x2 - 16) + "," + (y - 10) + " L" + x2 + "," + y + " L" + (x2 - 16) + "," + (y + 10), fill: "none", stroke: INK, "stroke-width": 2, "stroke-linejoin": "miter" }, svg);
+            return { shaft: shaft, head: head, x1: x1, x2: x2, y: y };
+          });
+          var dot = el("circle", { cx: 0, cy: 0, r: 11, fill: ACC }, svg);
+          var halo = el("circle", { cx: 0, cy: 0, r: 26, fill: "none", stroke: ACC, "stroke-width": 3, opacity: 0 }, svg);
+          gsap.set([dot, halo], { opacity: 0 });
+
+          var tl = gsap.timeline({ paused: true });
+          tl.fromTo("#bf-grid", { x: 0, y: 0 }, { x: -48, y: -24, duration: 10, ease: "none" }, 0);
+          tl.fromTo("#bf-kicker", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.out" }, 0.1);
+
+          // 1. plot: each box draws at plotter speed (constant, linear), its label and sub type on, then the arrow
+          var t = 0.4, SPEED = 2200; // px a second
+          parts.forEach(function (p, i) {
+            var len = plot(p.box);
+            tl.set(p.box, { opacity: 1 }, t);
+            tl.to(p.box, { strokeDashoffset: 0, duration: len / SPEED, ease: "none" }, t);
+            tl.fromTo(p.ticks, { opacity: 0 }, { opacity: 0.6, duration: 0.2 }, t + len / SPEED);
+            tl.fromTo(p.lab, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "steps(12)" }, t + 0.15);
+            tl.fromTo(p.sub, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power1.out" }, t + 0.35);
+            if (p.val) gsap.set(p.val, { opacity: 0 });
+            t += len / SPEED + 0.1;
+            var a = arrows[i];
+            if (a) {
+              var l2 = plot(a.shaft); plot(a.head);
+              tl.set([a.shaft, a.head], { opacity: 1 }, t);
+              tl.to(a.shaft, { strokeDashoffset: 0, duration: l2 / SPEED * 2, ease: "none" }, t);
+              tl.to(a.head, { strokeDashoffset: 0, duration: 0.08, ease: "none" }, t + l2 / SPEED * 2);
+              t += l2 / SPEED * 2 + 0.12;
+            }
+          });
+
+          // 2. the signal: a dot runs along each arrow (never across a label); at each box the outline
+          //    flashes, a halo ring grows from its centre and the value lands above it
+          t += 0.4;
+          var STEP = 0.55;
+          parts.forEach(function (p, i) {
+            var a = arrows[i - 1];
+            if (a) {
+              tl.set(dot, { attr: { cx: a.x1, cy: a.y }, opacity: 1 }, t);
+              tl.to(dot, { attr: { cx: a.x2 - 4 }, duration: STEP, ease: "power2.inOut" }, t);
+              t += STEP;
+              tl.set(dot, { opacity: 0 }, t);
+            }
+            tl.set(halo, { attr: { cx: p.x + W / 2, cy: Y + H / 2 } }, t);
+            tl.fromTo(p.box, { stroke: ACC }, { stroke: INK, duration: 0.5, ease: "power1.out", immediateRender: false }, t);
+            tl.fromTo(halo, { opacity: 0.35, attr: { r: 20 } }, { opacity: 0, attr: { r: 110 }, duration: 0.5, ease: "power2.out", immediateRender: false }, t);
+            if (p.val) {
+              tl.fromTo(p.val, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out", immediateRender: false }, t + 0.05);
+              // earlier values step back so the newest one reads first
+              parts.slice(0, i).forEach(function (q) { if (q.val) tl.to(q.val, { color: "#8fb3d9", duration: 0.3 }, t + 0.05); });
+            }
+            t += 0.35;
+          });
+          tl.fromTo("#bf-caption", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, t + 0.1);
+          window.__timelines = window.__timelines || {};
+          window.__timelines["blueprint-flow"] = tl;
+        })();
+      </script>
+    </div>
+  </body>
+</html>
