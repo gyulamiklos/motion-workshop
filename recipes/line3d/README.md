@@ -71,6 +71,23 @@ A scene is a pure function of time: build everything once, then `draw(t)` sets u
 
 **Builders** (line geometry): `sphereLatLong`, `ring`, `sphereCells`, `cellCentre`, `blobRegions`, `gridFloor`, `cellGrid` (+ `boxes`), `box`, `wallGrid`, `path`, `hatch`, `tunnel`, `instances`, `figure`, `warp`. **Points:** `points(stage, positions, opts)`, `scatter(n, { kind: "box" | "shell" | "walls" | "galaxy" })`. **Text:** `textPath(stage, text, curve, opts)` → group with `paint(head, { ahead, window })`. Details in `cards/primitives.md`.
 
+## Blender scenes
+For a hero scene that needs real light, the kit's look is also built in Blender (Eevee): haze lit by the accent
+points, motion blur on every frame, bloom above 1.0 only. Same beats and camera keys as the HTML block; the HUD stays
+in HTML on top of the rendered video, and the script writes `proj.json`, the screen position of each HUD anchor per frame.
+
+| Script | What |
+|---|---|
+| `blender/skybox_room.py` | the skybox room of `skybox-room.html` (516 frames, ~0.4 s a frame on the NVIDIA GPU) |
+
+```bash
+scripts/blender.sh -b --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR            # frames + proj.json
+scripts/blender.sh -b --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR --pick 30,200   # a few frames
+scripts/blender.sh --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR --open        # look around in the window
+```
+`scripts/blender.sh` runs the pinned version (`blender.version`) on the NVIDIA GPU; on the integrated GPU a frame took ~12× longer.
+The text on the curve uses Lato Black from the system fonts (OFL).
+
 ## Tests
 Kit logic that runs without a GPU (camera rig, colours, occluder geometry, shutter times, builders):
 
