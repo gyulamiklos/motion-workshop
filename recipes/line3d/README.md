@@ -80,6 +80,7 @@ in HTML on top of the rendered video, and the script writes `proj.json`, the scr
 |---|---|
 | `blender/skybox_room.py` | the skybox room of `skybox-room.html` (516 frames, ~0.4 s a frame on the NVIDIA GPU) |
 | `blender/crowd.py` | six striped figures turn accent, copies fill the floor (6 → 60 → 600 → 7 052) while the camera rises; 336 frames in ~3 min |
+| `blender/collapse.py` | wire crates, a tree and a panel break into Voronoi pieces, a burst kicks them, they fall into rubble with loose shards (rigid bodies, baked); 276 frames in ~2 min |
 
 ```bash
 scripts/blender.sh -b --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR            # frames + proj.json
