@@ -31,3 +31,5 @@ research/
 tools/tts/.venv/
 tools/tts/voices/
 projects/*/assets/voice/
+
+__pycache__/
