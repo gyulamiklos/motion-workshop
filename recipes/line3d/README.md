@@ -85,6 +85,8 @@ scripts/blender.sh -b --factory-startup -P recipes/line3d/blender/skybox_room.py
 scripts/blender.sh -b --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR --pick 30,200   # a few frames
 scripts/blender.sh --factory-startup -P recipes/line3d/blender/skybox_room.py -- --out DIR --open        # look around in the window
 ```
+The shared parts (stage, eases and camera rig, materials, lines, point clouds, text on a path, the run loop) are in
+`recipes/blender/kit.py`; a scene script is the world, `pose(t)` and its HUD anchors.
 `scripts/blender.sh` runs the pinned version (`blender.version`) on the NVIDIA GPU; on the integrated GPU a frame took ~12× longer.
 The text on the curve uses Lato Black from the system fonts (OFL).
 
