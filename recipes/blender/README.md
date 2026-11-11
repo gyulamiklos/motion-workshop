@@ -14,7 +14,7 @@ The film starts with the cheapest tier that is enough (`docs/decisions.md`, 2026
 | 2. Three.js kit (`recipes/line3d/`) | quick wire 3D, no real light | a minute |
 | 3. Blender (this kit) | a hero 3D scene that lives on light, haze, a crowd, real motion blur or physics | ~0.4 s a frame on the NVIDIA GPU |
 
-A Blender scene is a video inside the HyperFrames composition; text and HUD stay in HTML on top, placed from `proj.json`.
+A Blender scene is a video inside the HyperFrames composition; text and HUD stay in HTML on top, placed from `proj.json`. `scripts/blender-block.sh <scene.py> <scene.hud.json>` builds that block from `templates/blender-hud/`.
 
 ## Cards
 | Card | Piece | Technique it gives |

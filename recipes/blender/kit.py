@@ -665,7 +665,7 @@ def simulate(stage, nfr):
 # ---------------------------------------------------------------- run
 def run(stage, a, duration, pose, anchors=None):
     """Hook pose(t) into the frame-change handler, then: --open leaves the window with the timeline live; otherwise
-    write proj.json (anchors(t) -> dict per frame, after pose) on a full run or --proj-only, and render --pick frames
+    write proj.json (anchors(t) -> dict per frame, after pose; empty without anchors) on a full run or --proj-only, and render --pick frames
     or the --frames range (default: all)."""
     sc = stage.sc
     nfr = int(round(duration * FPS))
@@ -680,7 +680,8 @@ def run(stage, a, duration, pose, anchors=None):
                 area.spaces.active.region_3d.view_perspective = "CAMERA"
         return
     f0, f1 = (int(x) for x in a.frames.split("-")) if a.frames else (0, nfr - 1)
-    if anchors and (a.proj_only or (not a.pick and f0 == 0 and f1 >= nfr - 1)):
+    anchors = anchors or (lambda t: {})
+    if a.proj_only or (not a.pick and f0 == 0 and f1 >= nfr - 1):
         frames = []
         for f in range(nfr):
             sc.frame_set(f)
