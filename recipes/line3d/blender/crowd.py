@@ -21,8 +21,7 @@ T_REVEAL, D_REVEAL = 1.55, 1.9                     # the camera falls back and u
 cam_at = kit.camera_rig([
     dict(t=0, pos=[0, 1.05, 5.4], dir=[0, -2.5], fov=38),
     dict(t=T_REVEAL, pos=[0, 1.1, 4.6], dir=[0, -3], fov=38, ease="sine.inOut"),
-    dict(t=T_REVEAL + D_REVEAL, pos=[0.6, 7.2, 15.5], dir=[2, -23], fov=44, ease="power3.inOut"),
-    dict(t=DUR, pos=[0.2, 8.4, 9.5], dir=[1, -31], fov=46, ease="sine.inOut"),
+    dict(t=DUR, pos=[0.5, 8.2, 13.0], dir=[1.5, -26], fov=45, ease="sine.inOut"),   # one move that settles, no stop and restart
 ], amp=0.03, seed=SEED)
 
 st = kit.Stage(background="#0a090c", samples=A.samples, shutter=0.5, bloom=0.7, volumetric_end=80)
