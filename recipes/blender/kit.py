@@ -572,6 +572,96 @@ def scanline(name, freq=16.0, duty=0.42, edge=1.0, stripe=0.5, fill="#0d0c10", a
     out = N.new("ShaderNodeOutputMaterial"); L.new(mix.outputs[0], out.inputs["Surface"])
     return m
 
+# ---------------------------------------------------------------- physics (rigid body)
+# Pieces are meshes in Blender coordinates, already placed in the world (origin at 0). The sim is stepped once through
+# every frame before rendering, so it is cached and the same on every run; pose(t) never touches a body.
+def wire_solid(stage, name, me, mat, wire=0.012):
+    """A mesh drawn as its edges (wireframe modifier) with an emit material; colour it with set_color."""
+    me.materials.clear(); me.materials.append(mat)
+    ob = stage.link(bpy.data.objects.new(name, me))
+    md = ob.modifiers.new("wire", "WIREFRAME")
+    md.thickness, md.use_even_offset, md.use_replace, md.use_boundary = wire, True, True, True
+    set_color(ob, WHITE, 1.0)
+    return ob
+
+def fracture(me, n, seed, gap=0.985):
+    """Split a convex mesh into about n convex pieces: Voronoi cells around random seeds inside it, each cut out with
+    bisect planes and capped. Returns [(centre, mesh)]; each mesh is recentred on its centre, shrunk a little (`gap`)
+    so neighbouring wires do not fight."""
+    r = mulberry32(seed)
+    vs = [v.co.copy() for v in me.vertices]
+    lo = Vector([min(v[i] for v in vs) for i in range(3)]); hi = Vector([max(v[i] for v in vs) for i in range(3)])
+    polys = [(p.center.copy(), p.normal.copy()) for p in me.polygons]
+    seeds, tries = [], 0
+    while len(seeds) < n and tries < n * 400:
+        tries += 1
+        p = Vector([lerp(lo[i], hi[i], r()) for i in range(3)])
+        if all((p - c).dot(nm) < -0.03 for c, nm in polys): seeds.append(p)
+    out = []
+    for i, si in enumerate(seeds):
+        bm = bmesh.new(); bm.from_mesh(me)
+        for j, sj in enumerate(seeds):
+            if j == i or not bm.verts: continue
+            bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(si + sj) / 2,
+                                   plane_no=(sj - si).normalized(), clear_outer=True, dist=1e-6)
+            bd = [e for e in bm.edges if e.is_boundary]
+            if bd: bmesh.ops.holes_fill(bm, edges=bd, sides=64)
+        if len(bm.verts) < 4: bm.free(); continue
+        bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(1.0), verts=bm.verts[:], edges=bm.edges[:])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        c = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+        bmesh.ops.translate(bm, vec=-c, verts=bm.verts[:])
+        bmesh.ops.scale(bm, vec=(gap, gap, gap), verts=bm.verts[:])
+        cm = bpy.data.meshes.new("cell"); bm.to_mesh(cm); bm.free()
+        out.append((c, cm))
+    return out
+
+def rigid_world(stage, nfr, gravity=9.81, substeps=12, iterations=30):
+    """The scene's rigid body world for nfr frames, gravity in m/s^2."""
+    sc = stage.sc
+    bpy.context.view_layer.update()
+    bpy.ops.rigidbody.world_add()
+    w = sc.rigidbody_world
+    w.point_cache.frame_start, w.point_cache.frame_end = 0, nfr
+    w.substeps_per_frame, w.solver_iterations = substeps, iterations
+    sc.gravity = (0, 0, -gravity)
+    return w
+
+def rigid(ob, passive=False, mass=1.0, shape="CONVEX_HULL", friction=0.6, bounce=0.25, layer=0):
+    """Make ob a rigid body. layer: bodies collide only with bodies sharing a layer (0 or 1); ground should use both."""
+    bpy.context.view_layer.update()
+    with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob], selected_editable_objects=[ob]):
+        bpy.ops.rigidbody.object_add(type="PASSIVE" if passive else "ACTIVE")
+    rb = ob.rigid_body
+    rb.collision_shape, rb.mass, rb.friction, rb.restitution = shape, mass, friction, bounce
+    rb.use_margin, rb.collision_margin = True, 0.004
+    rb.linear_damping, rb.angular_damping = 0.04, 0.25
+    rb.collision_collections = [i == layer or (passive and i < 2) for i in range(20)]
+
+def hold_until(ob, frame):
+    """The body stands where it is (animated, not simulated) until `frame`, then falls."""
+    rb = ob.rigid_body
+    rb.kinematic = True;  ob.keyframe_insert("rigid_body.kinematic", frame=0)
+    rb.kinematic = False; ob.keyframe_insert("rigid_body.kinematic", frame=frame)
+
+def burst(stage, loc, frame, strength, length=8, reach=4.0):
+    """A radial force field (Three.js point) that kicks every body near it for `length` frames from `frame`."""
+    bpy.ops.object.effector_add(type="FORCE", location=tuple(b3(loc)))
+    ob = bpy.context.object
+    f = ob.field
+    f.shape, f.use_max_distance, f.distance_max, f.strength = "POINT", True, reach, 0.0
+    f.keyframe_insert("strength", frame=max(0, frame - 1))
+    f.strength = strength; f.keyframe_insert("strength", frame=frame)
+    f.strength = 0.0;      f.keyframe_insert("strength", frame=frame + length)
+    return ob
+
+def simulate(stage, nfr):
+    """Bake the sim for nfr frames (call before run()). Stepping frame_set() in a background run does not fill the
+    cache; the bake does, and every later frame_set reads it."""
+    with bpy.context.temp_override(scene=stage.sc):
+        bpy.ops.ptcache.bake_all(bake=True)
+    stage.sc.frame_set(0)
+
 # ---------------------------------------------------------------- run
 def run(stage, a, duration, pose, anchors=None):
     """Hook pose(t) into the frame-change handler, then: --open leaves the window with the timeline live; otherwise
