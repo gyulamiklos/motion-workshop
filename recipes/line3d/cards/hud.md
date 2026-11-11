@@ -30,4 +30,4 @@ The world moves, the HUD stays: the eye has a stable layer to read while the 3D 
 - Accent only on "new" and the bar, never on the title.
 
 ## Reference
-Inventory rows 22, 24, 25 in `recipes/_principles.md`; reference 0:05–0:10 (log), 1:27 and 3:10 (leaders). Built in `recipes/line3d/globe-dive.html` (`#gd-log`, `#gd-lead`).
+Inventory rows 22, 24, 25 in `recipes/_principles.md`. Built in `recipes/line3d/globe-dive.html` (`#gd-log`, `#gd-lead`).

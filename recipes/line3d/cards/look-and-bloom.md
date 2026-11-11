@@ -32,4 +32,4 @@ Principles 1–3: lines instead of surfaces, depth as brightness, one accent on 
 - Points also test depth now, so a star field behind an occluder is hidden like a line.
 
 ## Reference
-Pixel samples at 0:07.6, 0:08.0, 1:26.0, 2:01.5, 3:09.0, 3:42.5 (principles, "Look"). Kit: `createStage`, `lineMaterial`, `lines`, `occluder`, `color`.
+Colours and bloom: principles, "Look". Kit: `createStage`, `lineMaterial`, `lines`, `occluder`, `color`.

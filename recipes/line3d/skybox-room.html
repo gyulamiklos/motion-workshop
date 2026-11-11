@@ -146,7 +146,7 @@
       // in frame; the graph keys look at the graph's centre (0.1, 0, -5), the hit keys at the hit point (0.4, 1.25, -5).
       const cam = K.cameraRig([
         { t: 0, pos: [0, 0.1, 4.2], dir: [0, 0], fov: 50 },
-        // a small counter-move before the whip (the reference drifts the other way for ~0.1 s)
+        // a small counter-move before the whip (the studied footage drifts the other way for ~0.1 s)
         { t: T_WHIP, pos: [0.2, 0.0, 2.4], dir: [7, 0], roll: -0.05, fov: 50, ease: "sine.inOut" },
         { t: T_WHIP + D_WHIP, pos: [-1.8, -0.4, 2.8], dir: [-46, 1], roll: 0.78, fov: 50, ease: "power4.inOut" },
         { t: T_BACK, pos: [-1.6, -0.35, 2.4], dir: [-44, 1], roll: 0.6, fov: 50, ease: "sine.out" },

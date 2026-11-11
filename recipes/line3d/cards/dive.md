@@ -30,4 +30,4 @@ The viewer never loses the thread: the thing they were looking at is the place t
 - The HUD that belongs to the old world leaves before the swap (a 0.25 s slide out), not after.
 
 ## Reference
-`research/simulation-ending/` 0:08.95–0:09.9; range sheet `bd2/range-9.4-10.0.jpg`. Built in `recipes/line3d/globe-dive.html` (`surfaceFrame`, `K.dive`).
+Built in `recipes/line3d/globe-dive.html` (`surfaceFrame`, `K.dive`).

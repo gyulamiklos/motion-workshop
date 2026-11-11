@@ -2,7 +2,7 @@
 
 A topic-free grammar for 3D-looking line animation: thin white lines in a dark, foggy space, one accent colour that marks what is alive, a camera that never stops and scene changes that are camera moves. Read this before planning any 3D or "systems" scene; build it with the blocks in `recipes/line3d/`.
 
-Learned from a music video (local reference, see the end). We keep the grammar and the numbers, never its pictures, words or music.
+Learned from studying reference footage (kept locally, never published). We keep the grammar and the numbers, never its pictures, words or music.
 
 ## The five rules
 
@@ -14,35 +14,35 @@ Learned from a music video (local reference, see the end). We keep the grammar a
 
 ## Inventory (25 techniques)
 
-Times are `m:ss.s` in the reference. The class says where the rule lives below.
+The class says where the rule lives below.
 
-| # | Technique | Time | Class |
-|---|---|---|---|
-| 1 | Latitude-longitude wire sphere; back hemisphere dashed and dimmer | 0:05–0:09 | primitive |
-| 2 | Cell-matrix surface: land masses as tiny outlined squares on the sphere, born one region at a time | 0:06–0:09 | primitive |
-| 3 | Concentric rings and a reticle around a point, collapsing to it | 0:04.9–0:05.3, 3:41 | primitive, event |
-| 4 | Ground of outlined cells (blocks, a city grid) seen from above | 0:09.5–0:10, 0:18 | primitive |
-| 5 | Rain column: instanced vertical streaks inside a cylinder over a disc with ripple rings | 0:34–0:38 | primitive |
-| 6 | Wire trees: flat outline billboards that swivel to the camera | 0:40–0:43 | primitive |
-| 7 | Perspective corridor of panels to a vanishing point | 0:46–0:48 | primitive |
-| 8 | Skybox room: a box seen from inside, dust of star points on its walls, axis labels | 1:24–1:31 | primitive |
-| 9 | Graph in a 3D plane: a curve with text riding along it, a limit band at the top | 1:28–1:31 | primitive |
-| 10 | Instanced crowd: one outlined figure, 6 copies then thousands, fading with distance | 2:00–2:02 | primitive |
-| 11 | Particle galaxy whose points turn into instanced cubes | 3:08–3:12 | primitive, event |
-| 12 | Warp field: radial streaks from the centre | 3:40–3:41 | primitive |
-| 13 | Floor grid with fog to the horizon, props as wire boxes and an icosphere | 1:58, 2:00 | primitive |
-| 14 | Continuous turn of the hero object while the HUD works | 0:06.4–0:09.0 | camera |
-| 15 | Dive: accelerate into the object, its surface cells become the next scene's grid | 0:08.95–0:09.9 | camera, transition |
-| 16 | Whip turn inside a room, lines smeared along the turn | 1:26.0–1:26.4 | camera, transition |
-| 17 | Pull-back reveal of scale: a handful of instances, then the camera falls back over thousands | 2:00.5–2:02 | camera |
-| 18 | 1 px white lines on near-black violet, about 85 % of the frame empty | throughout | look |
-| 19 | Bloom only on the accent and on single "live" points (a cursor star) | throughout | look |
-| 20 | Birth pulse: a new part arrives in accent and bloom, cools to white in ~0.1 s | 0:06.9, 0:07.6, 0:08.25 | event |
-| 21 | Flash frame: the whole frame lifts for one frame and decays over ~0.15 s | 0:04.88, 3:41.65 | event, transition |
-| 22 | Counter tied to the event: instance counts and values tick as things appear | 2:00, 1:28–1:31 | event, HUD |
-| 23 | Window hand-off: the old scene shrinks into a framed card while the next fills the screen | 0:34.9, 3:09.8 | transition |
-| 24 | Log panel: lines appear one per event, the current one on an accent bar | 0:05–0:10 | HUD |
-| 25 | Leader lines from a 3D point to a mono label; corner labels and readouts with units | 1:27, 3:10, throughout | HUD |
+| # | Technique | Class |
+|---|---|---|
+| 1 | Latitude-longitude wire sphere; back hemisphere dashed and dimmer | primitive |
+| 2 | Cell-matrix surface: land masses as tiny outlined squares on the sphere, born one region at a time | primitive |
+| 3 | Concentric rings and a reticle around a point, collapsing to it | primitive, event |
+| 4 | Ground of outlined cells (blocks, a city grid) seen from above | primitive |
+| 5 | Rain column: instanced vertical streaks inside a cylinder over a disc with ripple rings | primitive |
+| 6 | Wire trees: flat outline billboards that swivel to the camera | primitive |
+| 7 | Perspective corridor of panels to a vanishing point | primitive |
+| 8 | Skybox room: a box seen from inside, dust of star points on its walls, axis labels | primitive |
+| 9 | Graph in a 3D plane: a curve with text riding along it, a limit band at the top | primitive |
+| 10 | Instanced crowd: one outlined figure, 6 copies then thousands, fading with distance | primitive |
+| 11 | Particle galaxy whose points turn into instanced cubes | primitive, event |
+| 12 | Warp field: radial streaks from the centre | primitive |
+| 13 | Floor grid with fog to the horizon, props as wire boxes and an icosphere | primitive |
+| 14 | Continuous turn of the hero object while the HUD works | camera |
+| 15 | Dive: accelerate into the object, its surface cells become the next scene's grid | camera, transition |
+| 16 | Whip turn inside a room, lines smeared along the turn | camera, transition |
+| 17 | Pull-back reveal of scale: a handful of instances, then the camera falls back over thousands | camera |
+| 18 | 1 px white lines on near-black violet, about 85 % of the frame empty | look |
+| 19 | Bloom only on the accent and on single "live" points (a cursor star) | look |
+| 20 | Birth pulse: a new part arrives in accent and bloom, cools to white in ~0.1 s | event |
+| 21 | Flash frame: the whole frame lifts for one frame and decays over ~0.15 s | event, transition |
+| 22 | Counter tied to the event: instance counts and values tick as things appear | event, HUD |
+| 23 | Window hand-off: the old scene shrinks into a framed card while the next fills the screen | transition |
+| 24 | Log panel: lines appear one per event, the current one on an accent bar | HUD |
+| 25 | Leader lines from a 3D point to a mono label; corner labels and readouts with units | HUD |
 
 ## Rules with numbers
 
@@ -101,6 +101,3 @@ Hard cuts between 3D worlds only on a strong beat, and never more than one in th
 - Bloom on white lines makes everything soft; threshold it to the accent and to the brightest points.
 - Thick lines (3 px and up) read as UI, not as a 3D world; keep 1 px and use alpha for hierarchy.
 - A camera that stops for the text kills the space. Text lands still in the HUD layer; the world keeps moving under it.
-
-## Reference
-`research/simulation-ending/` (local, never committed): `source.mp4`, measurement in `bd2/` (`range-*.jpg` sheets, `motion.csv`). Pixel samples at 0:07.6, 0:08.0, 1:26.0, 2:01.5, 3:09.0, 3:42.5; pulse and dive tracking over 0:06.0–0:09.95; flash frames at 0:04.88 and 3:41.65.

@@ -12,7 +12,7 @@ The accent means "now". A pulse that cools leaves a calm white world and a clear
 ## Motion core (measured at 60 fps, the same shape three times)
 - **Pulse:** `K.pulse(t, t0, { attack: 0.06, half: 0.025 })`: 0 before `t0`, up to 1 in 3–4 frames (`power2.out`), then exponential decay, half-life ≈ 1.5 frames. Feed it to `set({ pulse })`; `hold` keeps a part in the accent for longer (a live point).
 - **Flash:** `K.flash(t, t0)` → `stage.flash`: luma +50/255 in one frame, half-life ≈ 3 frames, slightly vignetted.
-- **One event at a time:** the next pulse starts after the previous one has cooled; events land on a beat (≈ 0.65 s in the reference).
+- **One event at a time:** the next pulse starts after the previous one has cooled; events land on a beat (≈ 0.65 s in the studied footage).
 - **Tie a number to it:** a log row, a counter or a label changes on the pulse frame (`tl` rows at the same `t0`).
 
 ## Parameters
@@ -29,4 +29,4 @@ The accent means "now". A pulse that cools leaves a calm white world and a clear
 - Use the flash at most once or twice a film.
 
 ## Reference
-Pulses 0:06.9, 0:07.6, 0:08.25; flash frames 0:04.88 and 3:41.65 (principles, "Event grammar"). Kit: `pulse`, `flash`, `PULSE`, `FLASH`.
+Principles, "Event grammar". Kit: `pulse`, `flash`, `PULSE`, `FLASH`.
