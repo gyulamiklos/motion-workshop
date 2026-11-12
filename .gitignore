@@ -29,6 +29,7 @@ CLAUDE.local.md
 research/
 # generated, rebuilt by tools/tts/setup.sh and tools/dev-recap/build.mjs
 tools/tts/.venv/
+tools/tts/.venv-moss/
 tools/tts/voices/
 projects/*/assets/voice/
 

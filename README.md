@@ -13,8 +13,8 @@ Motion graphics videók Claude Code-dal, [HyperFrames](https://github.com/heygen
 | `motion-breakdown` | Egy referenciavideó mozgásának visszafejtése: mérés, receptkártya, újrahasznosítható blokk | „Nézd meg ezt a videót, és tanuld meg a nyitó mozgását.” (a fájl elérési útjával) |
 
 A filmek egy márkacsomagból dolgoznak (`brands/<márka>/`: `BRAND.md`, `FRAME.md`, betűk, logók,
-`blocks/<márka>-title.html` és `-outro.html`); ezek helyiek, a repóban nincsenek. A hang helyben készül (Piper), szöveg
-nem megy külső szolgáltatóhoz. Alapértelmezett hang: `imre` (férfi); női hang: `anna`, `berta`.
+`blocks/<márka>-title.html` és `-outro.html`); ezek helyiek, a repóban nincsenek. A hang helyben készül, szöveg
+nem megy külső szolgáltatóhoz (lásd [Magyar hang](#magyar-hang)).
 A magyarázó videók márka nélkül, a `styles/` alatti stíluscsomagokból dolgoznak (ezek a repóban vannak).
 
 ## Beállítás (egyszer)
@@ -33,7 +33,7 @@ echo 'export MOTION_WORKSHOP="'"$PWD"'"' >> ~/.bashrc
 npx -y hyperframes@$(cat hyperframes.version) skills update
 npx -y hyperframes@$(cat hyperframes.version) telemetry disable
 
-# 3. Receptkönyvtár, magyar hang
+# 3. Receptkönyvtár, magyar hang (NVIDIA GPU-val, 8 GB-tól a MOSS-hangot is telepíti)
 scripts/update-shotcraft.sh --sync
 tools/tts/setup.sh
 
@@ -47,6 +47,22 @@ scripts/doctor.sh
 
 Új Claude Code munkamenetben a három skill már elérhető. A plugin frissítése:
 `claude plugin marketplace update motion-workshop`, a műhelyé: `git pull`.
+
+## Magyar hang
+
+Két helyi motor, a `tools/tts/say.py` választ közülük (`--engine auto|moss|piper`, alapból `auto`):
+
+| Motor | Hangzás | Gép | Hangok |
+|---|---|---|---|
+| **MOSS-TTS v1.5** (alapértelmezett) | természetes | NVIDIA GPU, legalább 8 GB VRAM; 8 GB-on kb. 7 mp számítás 1 mp hangra, ~24 GB letöltés | `male` (alap), `female` |
+| **Piper** (tartalék) | gépies, de azonnali | bármilyen CPU, ~200 MB | `imre` (alap), `anna`, `berta` |
+
+- Telepítés: `tools/tts/setup.sh` (a Piper mindig, a MOSS akkor, ha van 8 GB-os NVIDIA GPU); `--moss` vagy `--no-moss` kikényszeríti.
+  Ha a MOSS nincs telepítve, az `auto` a Pipert használja.
+- A MOSS minden sort többször felmond (`--takes 3`), és Whisperrel kiválasztja a legjobbat: néha megakad vagy
+  őzik, ezt szűri ki. A beszélő egy rögzített referenciahang (`tools/tts/voices-moss/`, ezt is a MOSS generálta),
+  így a film végig ugyanazzal a hanggal szól.
+- Számokat és jeleket betűvel írj a szövegbe („tizenkétezer-négyszázötven”, nem „12 450”).
 
 ## Használat
 

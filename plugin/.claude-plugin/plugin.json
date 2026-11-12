@@ -1,6 +1,6 @@
 {
   "name": "motion-workshop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Brand films, concept explainers and dev-team recap videos and motion reverse-engineering with HyperFrames. The skills drive the tools in the motion-graphics workshop repo ($MOTION_WORKSHOP, or the current repo).",
   "author": { "name": "Gyula Miklós" }
 }
