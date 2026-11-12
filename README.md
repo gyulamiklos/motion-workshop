@@ -10,7 +10,7 @@ Motion graphics videók Claude Code-dal, [HyperFrames](https://github.com/heygen
 |---|---|---|
 | `dev-recap` | Rövid videó arról, mi került be a fő ágba egy időszakban (hét, sprint), PR-onként egy jelenet, magyar hangalámondással | „Csinálj recapet a múlt hétről az app és a web repóból.” |
 | `motion-film` | Márkás film valódi termékképernyőkből: teaser, funkcióvideó, weboldalra szánt animáció | „Készíts 20 mp-es teasert az új regisztrációs űrlapról.” |
-| `motion-explainer` | Magyarázó videó egy fogalomról (programnyelv, algoritmus, rendszer) három stílus egyikében: kódszerkesztő, krétatábla, tervrajz | „Készíts egyperces táblás magyarázó videót a Haskell curry-zéséről.” |
+| `motion-explainer` | Magyarázó videó egy fogalomról (programnyelv, algoritmus, rendszer) két stílus egyikében: kódszerkesztő, tervrajz | „Készíts egyperces magyarázó videót a Haskell curry-zéséről.” |
 | `motion-breakdown` | Egy referenciavideó mozgásának visszafejtése: mérés, receptkártya, újrahasznosítható blokk | „Nézd meg ezt a videót, és tanuld meg a nyitó mozgását.” (a fájl elérési útjával) |
 
 A filmek egy márkacsomagból dolgoznak (`brands/<márka>/`: `BRAND.md`, `FRAME.md`, betűk, logók,

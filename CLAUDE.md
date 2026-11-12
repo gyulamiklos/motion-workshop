@@ -12,7 +12,7 @@ A repó publikus. Ami személyes vagy megrendelői, az **csak helyben** van, a `
 |---|---|
 | `projects/YYYY-MM-DD_<név>/` | Egy film = egy HyperFrames-projekt (`scripts/new-film.sh`). `frame.md` = a márka vagy a stílus videós nyelve, a `/hyperframes` skill magától olvassa. Helyi. |
 | `brands/<márka>/` | Márkacsomag: `BRAND.md` (hang, szabályok, alap repók, felvevő), `FRAME.md`, CSS, betűk, logók, `blocks/` (`*-title.html`, `*-outro.html`). Helyi. |
-| `styles/<stílus>/` | Explainer-stíluscsomagok (`code`, `chalk`, `blueprint`): `FRAME.md`, `blocks/`, betűk. A márkacsomag formája, de publikus, gitben van. |
+| `styles/<stílus>/` | Explainer-stíluscsomagok (`code`, `blueprint`): `FRAME.md`, `blocks/`, betűk. A márkacsomag formája, de publikus, gitben van. |
 | `templates/dev-recap/` | A fejlesztői összefoglaló jelenetblokkjai. |
 | `tools/` | `tts` (helyi magyar hang, Piper), `dev-recap` (gyűjtés, szűrés, összerakás), `breakdown` (referenciavideó mérése és összevetése); a termékfelvevők (`*-capture`) helyiek. |
 | `recipes/` | Visszafejtett mozgás-receptek (kártya + blokk). A referenciavideók helyiek, gitben soha. |
