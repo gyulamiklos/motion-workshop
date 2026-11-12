@@ -57,6 +57,6 @@ what, what flows where, in what order.
 - Every box has a mono label; every figure a kicker (`FIG. n · NAME`).
 
 ## Never
-- Hand-drawn wobble (that is the `chalk` style), icons, emoji, photos.
+- Hand-drawn wobble, icons, emoji, photos.
 - A whole drawing at once: plot it.
 - Orange on anything that is not the signal, a dimension or the current value.
