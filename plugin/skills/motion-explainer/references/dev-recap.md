@@ -1,9 +1,6 @@
----
-name: dev-recap
-description: Make a short video that sums up what a dev team shipped in a period (a week, a sprint, a release) from the git history and merged pull requests of one or more repos, in the team's brand, with optional local Hungarian voiceover. Use when someone asks for a recap, changelog or sprint-review video, "what did we ship", "mit csináltunk a héten", "heti összefoglaló", "fejlesztői összefoglaló videó", or a video about recent changes for the team.
----
-
 # Dev recap video
+
+The recap branch of the `motion-explainer` skill: a film that explains what the team shipped. The hard rules are repeated in the skill itself.
 
 One video per request: what reached the main branch in the period, one scene per change, every claim traceable to a PR or commit. Rules adapted from the MIT-licensed `/brag` skill (brag-video, Shunit Haviv Hakimi): hook first, cover everything, claims from the project, private stays private, readable timing.
 

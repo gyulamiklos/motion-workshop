@@ -1,6 +1,6 @@
 ---
 name: motion-film
-description: Make a branded motion-graphics film (product teaser, feature film, sales or website video, title card, logo sting) with HyperFrames in the motion-graphics workshop, from real product screens and a brand pack. Use when someone asks for a promo, teaser, product or feature video, an animated explainer of a product change, "animáld meg", "készíts videót az appról", or a motion graphic for a product app or website. For a team recap of shipped changes use dev-recap; to copy a technique from a reference video use motion-breakdown.
+description: Make a branded motion-graphics film (product teaser, feature film, sales or website video, title card, logo sting) with HyperFrames in the motion-graphics workshop, from real product screens and a brand pack. Use when someone asks for a promo, teaser, product or feature video, an animated explainer of a product change, "animáld meg", "készíts videót az appról", or a motion graphic for a product app or website. For a team recap of shipped changes use motion-explainer; to copy a technique from a reference video use motion-breakdown.
 ---
 
 # Brand film in the workshop

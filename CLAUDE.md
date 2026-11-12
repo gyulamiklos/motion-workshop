@@ -16,7 +16,7 @@ A repó publikus. Ami személyes vagy megrendelői, az **csak helyben** van, a `
 | `templates/dev-recap/` | A fejlesztői összefoglaló jelenetblokkjai. |
 | `tools/` | `tts` (helyi magyar hang, Piper), `dev-recap` (gyűjtés, szűrés, összerakás), `breakdown` (referenciavideó mérése és összevetése); a termékfelvevők (`*-capture`) helyiek. |
 | `recipes/` | Visszafejtett mozgás-receptek (kártya + blokk). A referenciavideók helyiek, gitben soha. |
-| `plugin/` | A `motion-workshop` Claude Code plugin skilljei: `motion-film`, `motion-explainer`, `dev-recap`, `motion-breakdown`. Marketplace: `.claude-plugin/marketplace.json`. |
+| `plugin/` | A `motion-workshop` Claude Code plugin skilljei: `motion-film`, `motion-explainer` (a fejlesztői összefoglalóval), `motion-breakdown`. Marketplace: `.claude-plugin/marketplace.json`. |
 | `vendor/video-shotcraft/` | Receptkártya-könyvtár és hangok, rögzített commiton (`vendor/video-shotcraft.commit`); **nem módosítjuk**. A Remotion-demóit csak olvassuk és átültetjük. |
 | `renders/` | Kész MP4-ek, git nélkül. |
 
@@ -60,4 +60,4 @@ git config core.hooksPath .githooks   # klónonként egyszer
 
 ## Munkamód
 Tömörítéskor tartsd meg: módosított fájlok, a check parancs, nyitott döntés, az aktuális film mappája.
-Agentic-code skillek: `working-mode` mindig, `quality-gate` és `match-the-codebase` kódváltozás előtt, `git-workflow` commit előtt. Filmhez a `motion-film`, magyarázó videóhoz a `motion-explainer`, összefoglalóhoz a `dev-recap`, referenciához a `motion-breakdown` skill (a pluginból, vagy közvetlenül a `plugin/skills/` alól). Kezdés `/agentic-code:resume-work`, zárás `/agentic-code:save-work`.
+Agentic-code skillek: `working-mode` mindig, `quality-gate` és `match-the-codebase` kódváltozás előtt, `git-workflow` commit előtt. Filmhez a `motion-film`, magyarázó videóhoz és fejlesztői összefoglalóhoz a `motion-explainer`, referenciához a `motion-breakdown` skill (a pluginból, vagy közvetlenül a `plugin/skills/` alól). Kezdés `/agentic-code:resume-work`, zárás `/agentic-code:save-work`.
