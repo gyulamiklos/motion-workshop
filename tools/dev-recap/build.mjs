@@ -1,5 +1,5 @@
 // Builds a dev-recap film (HyperFrames) from recap.json into a film folder made by scripts/new-film.sh.
-// Usage: node tools/dev-recap/build.mjs <recap.json> <film dir> [--voice male|female|none] [--engine auto|moss|piper] [--no-music]
+// Usage: node tools/dev-recap/build.mjs <recap.json> <film dir> [--voice male|female|none] [--lang hu|en] [--no-music]
 // recap.json: see tools/dev-recap/recap.example.json. Scene lengths come from reading time (0.3 s a word
 // plus the entrance) or from the voiceover, whichever is longer. An item with "composition" (a path relative
 // to recap.json, e.g. a diagram) uses that scene instead of the card; "min_duration" sets a floor in seconds.
@@ -11,12 +11,12 @@ import { fileURLToPath } from 'url';
 const WS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2);
 const flag = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; };
-const [recapPath, filmArg] = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && ['--voice', '--engine'].includes(args[i - 1])));
-if (!recapPath || !filmArg) throw new Error('usage: build.mjs <recap.json> <film dir> [--voice male|female|none] [--engine auto|moss|piper] [--no-music]');
+const [recapPath, filmArg] = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && ['--voice', '--lang'].includes(args[i - 1])));
+if (!recapPath || !filmArg) throw new Error('usage: build.mjs <recap.json> <film dir> [--voice male|female|none] [--lang hu|en] [--no-music]');
 const recap = JSON.parse(fs.readFileSync(recapPath, 'utf8'));
 const FILM = path.resolve(filmArg);
-const VOICE = flag('--voice', recap.voice?.speaker ?? 'male'); // male (default) or female; Piper names (imre, anna, berta) also work
-const ENGINE = flag('--engine', 'auto'); // tools/tts/say.py: MOSS when set up, otherwise Piper
+const VOICE = flag('--voice', recap.voice?.speaker ?? 'male'); // male (default), female, or a voice name of tools/tts/say.py
+const LANG = flag('--lang', recap.voice?.lang ?? 'hu'); // the recap's language: hu (Piper) or en (Kokoro)
 const MUSIC = !args.includes('--no-music');
 
 const comp = (...p) => path.join(FILM, 'compositions', ...p);
@@ -66,7 +66,7 @@ if (VOICE !== 'none' && lines.length) {
   fs.mkdirSync(path.dirname(tmp), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify(lines, null, 2));
   const py = path.join(WS, 'tools/tts/.venv/bin/python');
-  const r = spawnSync(py, [path.join(WS, 'tools/tts/say.py'), tmp, asset('voice'), '--voice', VOICE, '--engine', ENGINE], { encoding: 'utf8', stdio: ['ignore', 'inherit', 'pipe'] });
+  const r = spawnSync(py, [path.join(WS, 'tools/tts/say.py'), tmp, asset('voice'), '--voice', VOICE, '--lang', LANG], { encoding: 'utf8', stdio: ['ignore', 'inherit', 'pipe'] });
   if (r.status !== 0) throw new Error(`tts failed (run tools/tts/setup.sh first): ${r.stderr}`);
   vo = JSON.parse(fs.readFileSync(asset('voice', 'voice.json'), 'utf8'));
 }

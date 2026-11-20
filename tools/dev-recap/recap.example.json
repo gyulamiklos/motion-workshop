@@ -6,7 +6,7 @@
   "sources": "which repos and branches the items come from (not rendered)",
   "title": { "eyebrow": "ACME · FEJLESZTÉS", "line1": "Ezen a héten", "line2": "ez lett kész.", "accent": "kész.", "subtitle": "Október 19–25. · app, web" },
   "stats": { "eyebrow": "A hét számokban", "period": "2026. október 19–25.", "stats": [{ "value": 12, "label": "beolvasztott PR" }, { "value": 2, "label": "repó" }] },
-  "voice": { "speaker": "imre" },
+  "voice": { "speaker": "male", "lang": "hu" },
   "voice_lines": { "intro": "Ez történt a héten.", "stats": "Két repóban tizenkét változtatás került be.", "outro": "Jövő héten folytatjuk." },
   "items": [
     {

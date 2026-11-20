@@ -32,8 +32,7 @@ case "$(scripts/blender.sh -b --factory-startup --version 2>/dev/null | head -1)
   *) warn "blender $BV missing (3D scenes in recipes/line3d/blender): see scripts/blender.sh" ;;
 esac
 command -v yt-dlp >/dev/null 2>&1 && ok "yt-dlp $(yt-dlp --version)" || warn "yt-dlp missing (reference downloads): uv tool install yt-dlp --with yt-dlp-ejs"
-[ -x tools/tts/.venv/bin/python ] && [ "$(ls tools/tts/voices/*.onnx 2>/dev/null | wc -l)" -ge 1 ] && ok "voice (piper)" || warn "voice not set up: tools/tts/setup.sh"
-[ -x tools/tts/.venv-moss/bin/python ] && ok "voice (moss, default)" || warn "MOSS voice not set up, Piper is used (needs an 8 GB NVIDIA GPU): tools/tts/setup.sh --moss"
+[ -x tools/tts/.venv/bin/python ] && [ "$(ls tools/tts/voices/*.onnx tools/tts/voices/kokoro/*.pt 2>/dev/null | wc -l)" -ge 6 ] && ok "voice (en kokoro, hu piper)" || warn "voice not set up: tools/tts/setup.sh"
 for c in tools/*-capture; do
   [ -f "$c/package.json" ] || continue
   [ -d "$c/node_modules/puppeteer" ] && ok "$(basename "$c")" || warn "$(basename "$c") deps: (cd $c && npm install)"

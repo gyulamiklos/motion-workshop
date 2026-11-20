@@ -1,15 +1,14 @@
-"""Hungarian voiceover, one WAV per line, run on this machine (nothing leaves it).
+"""Voiceover, one WAV per line, run on this machine (nothing leaves it).
 
-Usage: tools/tts/.venv/bin/python tools/tts/say.py <lines.json> <out dir> [--engine auto|moss|piper] [--voice V] [--takes 3] [--rate 1.0]
+Usage: tools/tts/.venv/bin/python tools/tts/say.py <lines.json> <out dir> [--lang en|hu] [--voice V] [--rate 1.0]
   lines.json: [{"id": "intro", "text": "..."}, ...]
 Writes <out dir>/<id>.wav and <out dir>/voice.json ({"voice": ..., "lines": {id: {"file", "duration", "text"}}}).
 
-Engines (set up once with tools/tts/setup.sh):
-  moss   MOSS-TTS-Local-Transformer-v1.5 (tools/tts/moss_say.py): natural, needs an NVIDIA GPU with 8 GB or more and
-         about 7 s of compute for 1 s of speech on 8 GB. Voices: male (default), female.
-  piper  Piper: instant on any CPU, but sounds mechanical. Voices: imre (male, default), anna, berta (female).
-  auto   moss when it is set up, otherwise piper (the default).
-A voice name of the other engine is mapped: imre -> male, anna/berta -> female, and back.
+Engines (set up once with tools/tts/setup.sh), picked by the film's language:
+  en  Kokoro-82M: natural, about 10x real time on the CPU. Voices: michael (US male, default), george (UK male),
+      heart (US female).
+  hu  Piper: instant, but sounds mechanical. Voices: imre (male, default), anna, berta (female).
+male and female pick the default voice of either language.
 """
 import argparse
 import json
@@ -19,66 +18,85 @@ import sys
 import wave
 
 HERE = pathlib.Path(__file__).resolve().parent
-MOSS_PY = HERE / ".venv-moss" / "bin" / "python"
 LOUDNESS = "loudnorm=I=-15:TP=-1.5:LRA=11"  # every voice line at the same speech loudness (EBU R128)
-TO_MOSS = {"imre": "male", "anna": "female", "berta": "female"}
-TO_PIPER = {"male": "imre", "female": "anna"}
+VOICES = {
+    "en": {"michael": "am_michael", "george": "bm_george", "heart": "af_heart"},
+    "hu": {"imre": "imre", "anna": "anna", "berta": "berta"},
+}
+DEFAULT = {"en": {"male": "michael", "female": "heart"}, "hu": {"male": "imre", "female": "anna"}}
 
 
 def normalize(path: pathlib.Path) -> None:
     """Bring a WAV to -15 LUFS with a -1.5 dBTP ceiling (ffmpeg loudnorm), in place: the film then lands near -14 LUFS."""
     tmp = path.with_suffix(".norm.wav")
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(path), "-af", LOUDNESS, "-ar", "22050", str(tmp)], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(path), "-af", LOUDNESS, "-ar", "24000", str(tmp)], check=True)
     tmp.replace(path)
 
 
-def piper(lines, out: pathlib.Path, voice_name: str, rate: float) -> None:
+def piper(voice_name: str, rate: float):
     from piper import PiperVoice
     from piper.config import SynthesisConfig
 
     voice = PiperVoice.load(str(HERE / "voices" / f"hu_HU-{voice_name}-medium.onnx"))
     syn = SynthesisConfig(length_scale=rate)
-    manifest = {"voice": f"hu_HU-{voice_name}-medium", "lines": {}}
-    for line in lines:
-        path = out / f"{line['id']}.wav"
+
+    def speak(text: str, path: pathlib.Path) -> None:
         with wave.open(str(path), "wb") as wav:
-            voice.synthesize_wav(line["text"], wav, syn_config=syn)
-        normalize(path)
-        with wave.open(str(path), "rb") as wav:
-            duration = wav.getnframes() / wav.getframerate()
-        manifest["lines"][line["id"]] = {"file": path.name, "duration": round(duration, 3), "text": line["text"]}
-        print(f"{line['id']}: {duration:.2f}s")
-    (out / "voice.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            voice.synthesize_wav(text, wav, syn_config=syn)
+    return speak, f"piper:hu_HU-{voice_name}-medium"
+
+
+def kokoro(voice_name: str, rate: float):
+    import warnings
+
+    import numpy as np
+    import soundfile as sf
+    from kokoro import KModel, KPipeline
+
+    warnings.filterwarnings("ignore", module="torch")  # upstream deprecation noise on every run
+
+    root = HERE / "voices" / "kokoro"
+    model = KModel(repo_id="hexgrad/Kokoro-82M", config=str(root / "config.json"), model=str(root / "kokoro-v1_0.pth")).eval()
+    pipe = KPipeline(lang_code=voice_name[0], repo_id="hexgrad/Kokoro-82M", model=model)  # a: US, b: UK English
+    voice = str(root / f"{voice_name}.pt")
+
+    def speak(text: str, path: pathlib.Path) -> None:
+        audio = [r.audio.numpy() for r in pipe(text, voice=voice, speed=1 / rate)]
+        sf.write(str(path), np.concatenate(audio), 24000)
+    return speak, f"kokoro-82m:{voice_name}"
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("lines")
     ap.add_argument("out")
-    ap.add_argument("--engine", default="auto", choices=["auto", "moss", "piper"])
-    ap.add_argument("--voice", help="moss: male (default), female; piper: imre (default), anna, berta")
-    ap.add_argument("--takes", type=int, default=3, help="moss: takes per line, the best is kept")
-    ap.add_argument("--rate", type=float, default=1.0, help="piper: >1 slower, <1 faster (length_scale)")
+    ap.add_argument("--lang", default="en", choices=["en", "hu"], help="the film's language: en (Kokoro, default) or hu (Piper)")
+    ap.add_argument("--voice", default="male", help="male (default), female, or a voice name: en michael, george, heart; hu imre, anna, berta")
+    ap.add_argument("--rate", type=float, default=1.0, help=">1 slower, <1 faster")
     args = ap.parse_args()
 
-    engine = args.engine
-    if engine == "auto":
-        engine = "moss" if MOSS_PY.exists() else "piper"
-        if engine == "piper":
-            print("tts: MOSS is not set up (tools/tts/setup.sh --moss), using Piper", file=sys.stderr)
-    if engine == "moss":
-        if not MOSS_PY.exists():
-            sys.exit("tts: MOSS is not set up: tools/tts/setup.sh --moss")
-        voice = TO_MOSS.get(args.voice, args.voice) or "male"
-        cmd = [str(MOSS_PY), str(HERE / "moss_say.py"), args.lines, args.out, "--voice", voice, "--takes", str(args.takes)]
-        sys.exit(subprocess.run(cmd).returncode)
+    name = DEFAULT[args.lang].get(args.voice, args.voice)
+    if name not in VOICES[args.lang]:
+        sys.exit(f"tts: no {args.lang} voice {args.voice} ({', '.join(VOICES[args.lang])}, male, female)")
+    engine = kokoro if args.lang == "en" else piper
+    try:
+        speak, label = engine(VOICES[args.lang][name], args.rate)
+    except (ImportError, FileNotFoundError) as e:
+        sys.exit(f"tts: the {args.lang} voice is not set up ({e}): tools/tts/setup.sh")
 
-    voice = TO_PIPER.get(args.voice, args.voice) or "imre"
-    if voice not in ("imre", "anna", "berta"):
-        sys.exit(f"tts: no Piper voice {voice} (imre, anna, berta)")
+    lines = json.loads(pathlib.Path(args.lines).read_text(encoding="utf-8"))
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    piper(json.loads(pathlib.Path(args.lines).read_text(encoding="utf-8")), out, voice, args.rate)
+    manifest = {"voice": label, "lines": {}}
+    for line in lines:
+        path = out / f"{line['id']}.wav"
+        speak(line["text"], path)
+        normalize(path)
+        with wave.open(str(path), "rb") as wav:
+            duration = wav.getnframes() / wav.getframerate()
+        manifest["lines"][line["id"]] = {"file": path.name, "duration": round(duration, 3), "text": line["text"]}
+        print(f"{line['id']}: {duration:.2f}s")
+    (out / "voice.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
